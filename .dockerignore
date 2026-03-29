@@ -1,0 +1,11 @@
+.git
+.gitignore
+.DS_Store
+README.md
+
+miniprogram
+
+backend/node_modules
+backend/data
+backend/uploads
+backend/.env
