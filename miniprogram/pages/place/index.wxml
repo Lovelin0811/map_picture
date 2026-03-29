@@ -1,0 +1,29 @@
+<view class="container">
+  <view class="header card">
+    <text class="title">{{placeTitle}}</text>
+  </view>
+
+  <view wx:if="{{photos.length === 0}}" class="empty card">
+    <text class="empty-title">这个地点还没有照片</text>
+    <text class="empty-tip">点击右上角 + 添加第一张。</text>
+  </view>
+
+  <view wx:if="{{photos.length > 0}}" class="grid">
+    <view wx:for="{{photos}}" wx:key="id" class="photo-wrap">
+      <image
+        class="photo"
+        src="{{item.filePath}}"
+        mode="aspectFill"
+        data-path="{{item.filePath}}"
+        bindtap="onPreview"
+        data-id="{{item.id}}"
+        bindlongpress="onDelete"
+      />
+      <text class="time">{{item.timeText}}</text>
+    </view>
+  </view>
+
+  <view class="fab" bindtap="onAddPhoto">
+    <text class="fab-text">+</text>
+  </view>
+</view>

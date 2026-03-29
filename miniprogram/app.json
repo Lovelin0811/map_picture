@@ -1,0 +1,20 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/place/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "地理相册",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f6f8fb",
+    "backgroundTextStyle": "light"
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于进入小程序后定位到当前位置，并按地点管理照片"
+    }
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

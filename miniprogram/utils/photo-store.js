@@ -1,0 +1,67 @@
+const { request, makeUrl } = require('./api');
+
+function fetchProvinceStats() {
+  return request('/api/photos/stats', { method: 'GET' });
+}
+
+function getPhotosByProvince(provinceName) {
+  return request(`/api/photos?province=${encodeURIComponent(provinceName)}`, { method: 'GET' }).then((rows) =>
+    rows.map((item) => ({
+      id: item.id,
+      province: item.province,
+      filePath: makeUrl(item.fileUrl),
+      createdAt: item.createdAt
+    }))
+  );
+}
+
+function uploadPhoto(filePath, province) {
+  const token = require('./api').getAuthToken();
+  return new Promise((resolve, reject) => {
+    wx.uploadFile({
+      url: makeUrl('/api/photos/upload'),
+      filePath,
+      name: 'file',
+      formData: { province },
+      header: {
+        Authorization: token ? `Bearer ${token}` : ''
+      },
+      success: (res) => {
+        try {
+          const data = JSON.parse(res.data || '{}');
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve({
+              id: data.id,
+              province: data.province,
+              filePath: makeUrl(data.fileUrl),
+              createdAt: data.createdAt
+            });
+            return;
+          }
+          reject(new Error(data.message || '上传失败'));
+        } catch (error) {
+          reject(new Error('上传响应解析失败'));
+        }
+      },
+      fail: reject
+    });
+  });
+}
+
+function removePhoto(photoId) {
+  return request(`/api/photos/${photoId}`, { method: 'DELETE' });
+}
+
+function formatDate(timestamp) {
+  const d = new Date(timestamp);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+module.exports = {
+  fetchProvinceStats,
+  getPhotosByProvince,
+  uploadPhoto,
+  removePhoto,
+  formatDate
+};
