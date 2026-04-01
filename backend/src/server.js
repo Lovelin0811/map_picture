@@ -28,10 +28,45 @@ const upload = multer({ storage });
 
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
-app.use('/uploads', express.static(uploadsDir));
 
 function now() {
   return Date.now();
+}
+
+function getTokenFromRequest(req, { allowQuery = false } = {}) {
+  const authHeader = req.headers.authorization || '';
+  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (bearerToken) {
+    return bearerToken;
+  }
+  if (allowQuery) {
+    return String((req.query && req.query.token) || '').trim();
+  }
+  return '';
+}
+
+async function getSessionByToken(token) {
+  if (!token) {
+    return null;
+  }
+  const session = await get(
+    `
+    SELECT s.token, s.user_id as userId, s.expires_at as expiresAt,
+           u.nickname as nickname, u.avatar_url as avatarUrl, u.openid as openId
+    FROM sessions s
+    JOIN users u ON u.id = s.user_id
+    WHERE s.token = ?
+  `,
+    [token]
+  );
+  if (!session) {
+    return null;
+  }
+  if (session.expiresAt <= now()) {
+    await run(`DELETE FROM sessions WHERE token = ?`, [token]);
+    return null;
+  }
+  return session;
 }
 
 async function resolveOpenIdByCode(code) {
@@ -83,27 +118,13 @@ async function createSession(userId) {
 }
 
 async function authMiddleware(req, res, next) {
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const token = getTokenFromRequest(req);
   if (!token) {
     res.status(401).json({ message: '未登录' });
     return;
   }
-
-  const session = await get(
-    `
-    SELECT s.token, s.user_id as userId, s.expires_at as expiresAt,
-           u.nickname as nickname, u.avatar_url as avatarUrl, u.openid as openId
-    FROM sessions s
-    JOIN users u ON u.id = s.user_id
-    WHERE s.token = ?
-  `,
-    [token]
-  );
-  if (!session || session.expiresAt <= now()) {
-    if (session) {
-      await run(`DELETE FROM sessions WHERE token = ?`, [token]);
-    }
+  const session = await getSessionByToken(token);
+  if (!session) {
     res.status(401).json({ message: '登录已过期，请重新登录' });
     return;
   }
@@ -176,6 +197,42 @@ app.get('/api/photos', authMiddleware, async (req, res) => {
     [req.auth.userId, province]
   );
   res.json(rows);
+});
+
+app.get('/api/photos/file/:id', async (req, res) => {
+  const token = getTokenFromRequest(req, { allowQuery: true });
+  if (!token) {
+    res.status(401).json({ message: '未登录' });
+    return;
+  }
+  const session = await getSessionByToken(token);
+  if (!session) {
+    res.status(401).json({ message: '登录已过期，请重新登录' });
+    return;
+  }
+
+  const photoId = Number(req.params.id);
+  if (!Number.isFinite(photoId)) {
+    res.status(400).json({ message: '无效照片ID' });
+    return;
+  }
+
+  const target = await get(
+    `SELECT file_path as filePath FROM photos WHERE id = ? AND user_id = ?`,
+    [photoId, session.userId]
+  );
+  if (!target || !target.filePath) {
+    res.status(404).json({ message: '照片不存在' });
+    return;
+  }
+
+  const resolvedPath = path.resolve(target.filePath);
+  const resolvedUploadsDir = path.resolve(uploadsDir) + path.sep;
+  if (!resolvedPath.startsWith(resolvedUploadsDir) || !fs.existsSync(resolvedPath)) {
+    res.status(404).json({ message: '照片文件不存在' });
+    return;
+  }
+  res.sendFile(resolvedPath);
 });
 
 app.post('/api/photos/upload', authMiddleware, upload.single('file'), async (req, res) => {

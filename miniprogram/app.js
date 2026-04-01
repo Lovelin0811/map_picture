@@ -1,4 +1,4 @@
-const { manualLogin, clearSession } = require('./utils/auth');
+const { manualLogin, clearSession, restoreSession } = require('./utils/auth');
 
 App({
   globalData: {
@@ -10,7 +10,10 @@ App({
   },
 
   onLaunch() {
-    clearSession();
+    const session = restoreSession();
+    this.globalData.auth.status = session ? 'success' : 'idle';
+    this.globalData.auth.session = session;
+    this.globalData.auth.error = '';
   },
 
   async loginWithWechat(profile = {}) {

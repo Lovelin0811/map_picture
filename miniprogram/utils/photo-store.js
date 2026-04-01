@@ -1,4 +1,10 @@
-const { request, makeUrl } = require('./api');
+const { request, makeUrl, getAuthToken } = require('./api');
+
+function buildProtectedPhotoUrl(photoId) {
+  const token = getAuthToken();
+  const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : '';
+  return makeUrl(`/api/photos/file/${photoId}${tokenQuery}`);
+}
 
 function fetchProvinceStats() {
   return request('/api/photos/stats', { method: 'GET' });
@@ -9,14 +15,14 @@ function getPhotosByProvince(provinceName) {
     rows.map((item) => ({
       id: item.id,
       province: item.province,
-      filePath: makeUrl(item.fileUrl),
+      filePath: buildProtectedPhotoUrl(item.id),
       createdAt: item.createdAt
     }))
   );
 }
 
 function uploadPhoto(filePath, province) {
-  const token = require('./api').getAuthToken();
+  const token = getAuthToken();
   return new Promise((resolve, reject) => {
     wx.uploadFile({
       url: makeUrl('/api/photos/upload'),
@@ -33,7 +39,7 @@ function uploadPhoto(filePath, province) {
             resolve({
               id: data.id,
               province: data.province,
-              filePath: makeUrl(data.fileUrl),
+              filePath: buildProtectedPhotoUrl(data.id),
               createdAt: data.createdAt
             });
             return;

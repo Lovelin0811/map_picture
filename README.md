@@ -18,9 +18,10 @@
 ## 启动后端
 
 1. 进入 `backend` 目录
-2. 安装依赖：`npm install`
-3. 启动服务：`npm run dev`
-4. 默认地址：`http://127.0.0.1:3000`
+2. 确保 Node.js 版本 `>=18`
+3. 安装依赖：`npm install`
+4. 启动服务：`npm run dev`
+5. 默认地址：`http://127.0.0.1:3000`
 
 ## 启动小程序
 
@@ -31,5 +32,6 @@
 
 ## 说明
 
-- 后端 `wechat-login` 目前使用 mock openid（由 `code` 哈希生成）用于本地开发。
-- 线上请替换 `backend/src/server.js` 中 `resolveOpenIdByCode` 为微信 `jscode2session` 正式逻辑。
+- 后端 `wechat-login` 当前已使用微信 `jscode2session` 正式逻辑。
+- 运行前需要在后端环境变量中配置 `WECHAT_APPID` 与 `WECHAT_SECRET`。
+- 图片访问已改为鉴权接口 `/api/photos/file/:id`，不再公开静态目录。
