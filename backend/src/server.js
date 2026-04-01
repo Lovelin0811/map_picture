@@ -27,7 +27,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 app.use('/uploads', express.static(uploadsDir));
 
 function now() {
@@ -185,18 +185,32 @@ app.post('/api/photos/upload', authMiddleware, upload.single('file'), async (req
       res.status(400).json({ message: '缺少 province' });
       return;
     }
-    if (!req.file) {
-      res.status(400).json({ message: '缺少文件' });
-      return;
+    let fileUrl = '';
+    let filePath = '';
+    if (req.file) {
+      fileUrl = `/uploads/${req.file.filename}`;
+      filePath = req.file.path;
+    } else {
+      const fileBase64 = String((req.body && req.body.fileBase64) || '').trim();
+      const fileName = String((req.body && req.body.fileName) || '').trim();
+      if (!fileBase64) {
+        res.status(400).json({ message: '缺少文件' });
+        return;
+      }
+      const ext = path.extname(fileName || '.jpg').toLowerCase();
+      const safeExt = ext && ext.length <= 6 ? ext : '.jpg';
+      const filename = `${Date.now()}_${crypto.randomBytes(6).toString('hex')}${safeExt}`;
+      filePath = path.join(uploadsDir, filename);
+      fs.writeFileSync(filePath, Buffer.from(fileBase64, 'base64'));
+      fileUrl = `/uploads/${filename}`;
     }
-    const fileUrl = `/uploads/${req.file.filename}`;
     const createdAt = now();
     const result = await run(
       `
       INSERT INTO photos(user_id, province, file_url, file_path, created_at)
       VALUES(?, ?, ?, ?, ?)
     `,
-      [req.auth.userId, province, fileUrl, req.file.path, createdAt]
+      [req.auth.userId, province, fileUrl, filePath, createdAt]
     );
     res.json({
       id: result.lastID,

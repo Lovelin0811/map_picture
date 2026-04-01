@@ -1,5 +1,6 @@
 const { fetchProvinceStats } = require('../../utils/photo-store');
 const { PROVINCES, findProvinceByTapPoint } = require('../../utils/provinces');
+const { API_BASE } = require('../../config');
 
 function getProvinceLabelOffset(name, halfWidth) {
   const defaults = { anchorX: -halfWidth, anchorY: -10 };
@@ -222,7 +223,11 @@ Page({
     } catch (error) {
       const authError = (app.globalData.auth && app.globalData.auth.error) || '';
       const message = (error && (error.message || error.errMsg)) || authError || '登录失败';
-      wx.showToast({ title: message.slice(0, 20), icon: 'none' });
+      wx.showModal({
+        title: '登录失败诊断',
+        content: `错误: ${message}\n接口: ${API_BASE}`,
+        showCancel: false
+      });
     }
     this.syncAuthState();
   },

@@ -1,4 +1,4 @@
 module.exports = {
-  // 真机调试请改成你电脑局域网 IP，例如 http://192.168.1.20:3000
-  API_BASE: 'http://192.168.10.12:3000'
+  // 这里改成你绑定好的正式自定义域名，例如 https://api.example.com
+  API_BASE: 'https://express-wnlc-239982-8-1417219022.sh.run.tcloudbase.com'
 };

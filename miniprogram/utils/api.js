@@ -23,6 +23,7 @@ function request(path, { method = 'GET', data = null, headers = {} } = {}) {
     if (authToken) {
       finalHeaders.Authorization = `Bearer ${authToken}`;
     }
+
     wx.request({
       url: makeUrl(path),
       method,
