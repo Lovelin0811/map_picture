@@ -15,6 +15,7 @@
       "desc": "用于进入小程序后定位到当前位置，并按地点管理照片"
     }
   },
+  "lazyCodeLoading": "requiredComponents",
   "style": "v2",
   "sitemapLocation": "sitemap.json"
 }
