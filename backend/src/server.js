@@ -10,10 +10,23 @@ const { run, get, all, initDb } = require('./db');
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const sessionTtlMs = 7 * 24 * 60 * 60 * 1000;
+const defaultPageSize = Number(process.env.PHOTO_PAGE_SIZE || 30);
+const maxPageSize = Number(process.env.PHOTO_MAX_PAGE_SIZE || 80);
+const maxUploadMb = Number(process.env.MAX_UPLOAD_MB || 10);
+const maxUploadBytes = Math.max(1, Math.floor(maxUploadMb * 1024 * 1024));
 const corsAllowList = String(process.env.CORS_ORIGIN || '')
   .split(',')
   .map((item) => item.trim())
   .filter(Boolean);
+const allowedImageExt = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic']);
+const allowedImageMime = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/bmp',
+  'image/heic'
+]);
 
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -28,7 +41,19 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}_${crypto.randomBytes(6).toString('hex')}${safeExt}`);
   }
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: maxUploadBytes },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const mime = String(file.mimetype || '').toLowerCase();
+    if (!allowedImageExt.has(ext) || !allowedImageMime.has(mime)) {
+      cb(new Error('仅支持 jpg/png/gif/webp/bmp/heic 图片'));
+      return;
+    }
+    cb(null, true);
+  }
+});
 
 app.use(
   cors({
@@ -62,6 +87,14 @@ function parseOptionalFolderId(rawValue) {
   return value;
 }
 
+function parsePaging(req) {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const sizeRaw = Number(req.query.pageSize) || defaultPageSize;
+  const pageSize = Math.max(1, Math.min(maxPageSize, sizeRaw));
+  const offset = (page - 1) * pageSize;
+  return { page, pageSize, offset };
+}
+
 function getMimeTypeByExt(filePath) {
   const ext = path.extname(filePath || '').toLowerCase();
   const mimeMap = {
@@ -74,6 +107,33 @@ function getMimeTypeByExt(filePath) {
     '.heic': 'image/heic'
   };
   return mimeMap[ext] || 'application/octet-stream';
+}
+
+function resolveSafeUploadPath(filePath) {
+  if (!filePath) {
+    return '';
+  }
+  const resolvedPath = path.resolve(filePath);
+  const resolvedUploadsDir = path.resolve(uploadsDir) + path.sep;
+  if (!resolvedPath.startsWith(resolvedUploadsDir)) {
+    return '';
+  }
+  return resolvedPath;
+}
+
+async function unlinkUploadFileSafe(filePath) {
+  const resolvedPath = resolveSafeUploadPath(filePath);
+  if (!resolvedPath) {
+    return;
+  }
+  try {
+    await fs.promises.unlink(resolvedPath);
+  } catch (error) {
+    if (error && error.code !== 'ENOENT') {
+      // eslint-disable-next-line no-console
+      console.warn('unlink upload file failed:', error.message);
+    }
+  }
 }
 
 function getTokenFromRequest(req) {
@@ -227,6 +287,16 @@ app.get('/api/photos', authMiddleware, async (req, res) => {
     res.status(400).json({ message: '缺少 province' });
     return;
   }
+  const { page, pageSize, offset } = parsePaging(req);
+  const totalRow = await get(
+    `
+    SELECT COUNT(*) as total
+    FROM photos p
+    WHERE p.user_id = ? AND p.province = ?
+  `,
+    [req.auth.userId, province]
+  );
+  const total = Number((totalRow && totalRow.total) || 0);
   const rows = await all(
     `
     SELECT p.id, p.province, p.file_url as fileUrl, p.created_at as createdAt,
@@ -235,10 +305,17 @@ app.get('/api/photos', authMiddleware, async (req, res) => {
     LEFT JOIN folders f ON f.id = p.folder_id AND f.user_id = p.user_id
     WHERE p.user_id = ? AND p.province = ?
     ORDER BY p.created_at DESC
+    LIMIT ? OFFSET ?
   `,
-    [req.auth.userId, province]
+    [req.auth.userId, province, pageSize, offset]
   );
-  res.json(rows);
+  res.json({
+    items: rows,
+    page,
+    pageSize,
+    total,
+    hasMore: offset + rows.length < total
+  });
 });
 
 app.get('/api/folders', authMiddleware, async (req, res) => {
@@ -329,16 +406,7 @@ app.delete('/api/folders/:id', authMiddleware, async (req, res) => {
         folderId
       ]);
       await run(`DELETE FROM photos WHERE user_id = ? AND folder_id = ?`, [req.auth.userId, folderId]);
-      photos.forEach((item) => {
-        if (item.filePath && fs.existsSync(item.filePath)) {
-          try {
-            fs.unlinkSync(item.filePath);
-          } catch (error) {
-            // eslint-disable-next-line no-console
-            console.warn('unlink folder photo failed:', error.message);
-          }
-        }
-      });
+      await Promise.allSettled(photos.map((item) => unlinkUploadFileSafe(item.filePath)));
     }
     await run(`DELETE FROM folders WHERE id = ? AND user_id = ?`, [folderId, req.auth.userId]);
 
@@ -353,6 +421,20 @@ app.delete('/api/folders/:id', authMiddleware, async (req, res) => {
     res.status(500).json({ message: '删除文件夹失败', detail: error.message });
   }
 });
+
+function uploadPhotoMiddleware(req, res, next) {
+  upload.single('file')(req, res, (error) => {
+    if (!error) {
+      next();
+      return;
+    }
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      res.status(413).json({ message: `图片不能超过 ${maxUploadMb}MB` });
+      return;
+    }
+    res.status(400).json({ message: error.message || '上传文件校验失败' });
+  });
+}
 
 app.get('/api/photos/file/:id', authMiddleware, async (req, res) => {
   const photoId = Number(req.params.id);
@@ -381,7 +463,7 @@ app.get('/api/photos/file/:id', authMiddleware, async (req, res) => {
   res.sendFile(resolvedPath);
 });
 
-app.post('/api/photos/upload', authMiddleware, upload.single('file'), async (req, res) => {
+app.post('/api/photos/upload', authMiddleware, uploadPhotoMiddleware, async (req, res) => {
   try {
     const province = String((req.body && req.body.province) || '').trim();
     if (!province) {
@@ -401,7 +483,16 @@ app.post('/api/photos/upload', authMiddleware, upload.single('file'), async (req
         return;
       }
       const ext = path.extname(fileName || '.jpg').toLowerCase();
-      const safeExt = ext && ext.length <= 6 ? ext : '.jpg';
+      if (!allowedImageExt.has(ext)) {
+        res.status(400).json({ message: '不支持的图片格式' });
+        return;
+      }
+      const decodedSize = Buffer.byteLength(fileBase64, 'base64');
+      if (decodedSize > maxUploadBytes) {
+        res.status(413).json({ message: `图片不能超过 ${maxUploadMb}MB` });
+        return;
+      }
+      const safeExt = ext;
       const filename = `${Date.now()}_${crypto.randomBytes(6).toString('hex')}${safeExt}`;
       filePath = path.join(uploadsDir, filename);
       fs.writeFileSync(filePath, Buffer.from(fileBase64, 'base64'));
@@ -497,15 +588,7 @@ app.delete('/api/photos/:id', authMiddleware, async (req, res) => {
     }
 
     await run(`DELETE FROM photos WHERE id = ?`, [photoId]);
-
-    if (target.filePath && fs.existsSync(target.filePath)) {
-      try {
-        fs.unlinkSync(target.filePath);
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.warn('unlink photo file failed:', error.message);
-      }
-    }
+    await unlinkUploadFileSafe(target.filePath);
 
     res.json({ ok: true });
   } catch (error) {

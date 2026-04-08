@@ -8,17 +8,41 @@ function fetchProvinceStats() {
   return request('/api/photos/stats', { method: 'GET' });
 }
 
-function getPhotosByProvince(provinceName) {
-  return request(`/api/photos?province=${encodeURIComponent(provinceName)}`, { method: 'GET' }).then((rows) =>
-    rows.map((item) => ({
-      id: item.id,
-      province: item.province,
-      filePath: buildProtectedPhotoUrl(item.id),
-      createdAt: item.createdAt,
-      folderId: item.folderId ? Number(item.folderId) : null,
-      folderName: item.folderName || ''
-    }))
-  );
+function mapPhotoRow(item) {
+  return {
+    id: item.id,
+    province: item.province,
+    filePath: buildProtectedPhotoUrl(item.id),
+    createdAt: item.createdAt,
+    folderId: item.folderId ? Number(item.folderId) : null,
+    folderName: item.folderName || ''
+  };
+}
+
+function getPhotosByProvince(provinceName, { page = 1, pageSize = 30 } = {}) {
+  const query =
+    `province=${encodeURIComponent(provinceName)}` +
+    `&page=${encodeURIComponent(page)}` +
+    `&pageSize=${encodeURIComponent(pageSize)}`;
+  return request(`/api/photos?${query}`, { method: 'GET' }).then((payload) => {
+    if (Array.isArray(payload)) {
+      return {
+        items: payload.map(mapPhotoRow),
+        page,
+        pageSize,
+        total: payload.length,
+        hasMore: false
+      };
+    }
+    const items = ((payload && payload.items) || []).map(mapPhotoRow);
+    return {
+      items,
+      page: Number((payload && payload.page) || page),
+      pageSize: Number((payload && payload.pageSize) || pageSize),
+      total: Number((payload && payload.total) || items.length),
+      hasMore: !!(payload && payload.hasMore)
+    };
+  });
 }
 
 function getFoldersByProvince(provinceName) {

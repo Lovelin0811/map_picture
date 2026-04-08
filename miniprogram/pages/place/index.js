@@ -21,6 +21,10 @@ Page({
     folders: [],
     selectedFolderId: 'all',
     unclassifiedCount: 0,
+    currentPage: 1,
+    pageSize: 30,
+    hasMore: true,
+    loadingMore: false,
     folderEditorVisible: false,
     pendingFolderName: '',
     selectionMode: false,
@@ -42,8 +46,15 @@ Page({
     await this.refreshAllData();
   },
 
+  onReachBottom() {
+    if (!this.data.hasMore || this.data.loadingMore) {
+      return;
+    }
+    this.refreshPhotos(false);
+  },
+
   async refreshAllData() {
-    await Promise.all([this.refreshFolders(), this.refreshPhotos()]);
+    await Promise.all([this.refreshFolders(), this.refreshPhotos(true)]);
   },
 
   async refreshFolders() {
@@ -65,27 +76,85 @@ Page({
     }
   },
 
-  async refreshPhotos() {
-    const { province } = this.data;
+  async refreshPhotos(reset = false) {
+    const { province, currentPage, pageSize, allPhotos, loadingMore } = this.data;
     if (!province) {
-      this.setData({ allPhotos: [], photos: [] });
+      this.setData({ allPhotos: [], photos: [], hasMore: false, loadingMore: false });
       return;
     }
+    if (!reset && loadingMore) {
+      return;
+    }
+
+    const nextPage = reset ? 1 : currentPage + 1;
+    if (!reset) {
+      this.setData({ loadingMore: true });
+    }
+
     try {
-      const photos = await getPhotosByProvince(province);
-      const allPhotos = photos.map((item) => ({
-        ...item,
-        timeText: formatDate(item.createdAt),
-        displayPath: item.filePath
-      }));
-      const unclassifiedCount = allPhotos.filter((item) => !item.folderId).length;
-      this.setData({ allPhotos, unclassifiedCount }, () => {
-        this.applyPhotoFilter();
-        this.preparePhotoThumbnails();
+      const payload = await getPhotosByProvince(province, {
+        page: nextPage,
+        pageSize
       });
+      const incoming = (payload.items || []).map((item) => ({
+        ...item,
+        timeText: formatDate(item.createdAt)
+      }));
+      const merged = reset ? incoming : [...allPhotos, ...incoming];
+      const dedupMap = new Map();
+      merged.forEach((item) => {
+        dedupMap.set(Number(item.id), item);
+      });
+      const mergedPhotos = Array.from(dedupMap.values()).sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
+      const unclassifiedCount = mergedPhotos.filter((item) => !item.folderId).length;
+
+      this.setData(
+        {
+          allPhotos: mergedPhotos,
+          unclassifiedCount,
+          currentPage: nextPage,
+          hasMore: !!payload.hasMore,
+          loadingMore: false
+        },
+        () => {
+          this.applyPhotoFilter();
+          this.preparePhotoThumbnails();
+        }
+      );
     } catch (error) {
+      this.setData({ loadingMore: false });
       wx.showToast({ title: '加载照片失败', icon: 'none' });
     }
+  },
+
+  async preparePhotoThumbnails() {
+    const visible = (this.data.photos || []).slice(0, 36);
+    if (!visible.length) {
+      return;
+    }
+
+    let changed = false;
+    await Promise.all(
+      visible.map(async (item) => {
+        const photoId = Number(item.id);
+        if (!photoId || this.thumbnailCache[photoId]) {
+          return;
+        }
+        const localPath = await this.downloadToTempPath(photoId);
+        if (localPath) {
+          this.thumbnailCache[photoId] = localPath;
+          changed = true;
+        }
+      })
+    );
+
+    if (changed) {
+      this.applyPhotoFilter();
+    }
+  },
+
+  downloadToTempPath(photoId) {
+    return downloadPhotoToTemp(photoId);
   },
 
   async onAddPhoto() {
@@ -155,9 +224,8 @@ Page({
     if (!path) {
       return;
     }
-
-    const all = this.data.photos.map((item) => item.displayPath || item.filePath);
-    wx.previewImage({ current: path, urls: all });
+    const all = this.data.photos.map((item) => item.displayPath).filter(Boolean);
+    wx.previewImage({ current: path, urls: all.length ? all : [path] });
   },
 
   togglePhotoSelection(id) {
@@ -203,40 +271,6 @@ Page({
     this.exitSelectionMode();
   },
 
-  async preparePhotoThumbnails() {
-    const source = this.data.allPhotos || [];
-    if (!source.length) {
-      return;
-    }
-    const updated = await Promise.all(
-      source.map(async (item) => {
-        const photoId = Number(item.id);
-        if (!photoId) {
-          return item;
-        }
-        if (this.thumbnailCache[photoId]) {
-          return {
-            ...item,
-            displayPath: this.thumbnailCache[photoId]
-          };
-        }
-        const localPath = await this.downloadToTempPath(photoId);
-        if (localPath) {
-          this.thumbnailCache[photoId] = localPath;
-        }
-        return {
-          ...item,
-          displayPath: localPath || ''
-        };
-      })
-    );
-    this.setData({ allPhotos: updated }, () => this.applyPhotoFilter());
-  },
-
-  downloadToTempPath(photoId) {
-    return downloadPhotoToTemp(photoId);
-  },
-
   async onPhotoLongPress(e) {
     const { id } = e.currentTarget.dataset;
     if (!id) {
@@ -247,26 +281,6 @@ Page({
       return;
     }
     this.enterSelectionMode(id);
-  },
-
-  confirmDeletePhoto(id) {
-    wx.showModal({
-      title: '删除照片',
-      content: '确定删除这张照片吗？',
-      success: (res) => {
-        if (!res.confirm) {
-          return;
-        }
-        removePhoto(id)
-          .then(() => this.refreshAllData())
-          .catch((error) =>
-            wx.showToast({
-              title: (error && error.message) || '删除失败',
-              icon: 'none'
-            })
-          );
-      }
-    });
   },
 
   onBatchDeletePhotos() {
@@ -321,29 +335,12 @@ Page({
     });
   },
 
-  chooseFolderForPhoto(photoId) {
-    const { folders } = this.data;
-    const folderOptions = folders.map((item) => item.name);
-    const options = ['移出文件夹', ...folderOptions];
-
-    wx.showActionSheet({
-      itemList: options,
-      success: async (res) => {
-        try {
-          const folderId = res.tapIndex === 0 ? null : folders[res.tapIndex - 1].id;
-          await assignPhotoToFolder(photoId, folderId);
-          await this.refreshAllData();
-          wx.showToast({ title: '已更新', icon: 'success' });
-        } catch (error) {
-          wx.showToast({ title: '移动失败', icon: 'none' });
-        }
-      }
-    });
-  },
-
   onSelectFolder(e) {
     const folderId = String((e.currentTarget.dataset && e.currentTarget.dataset.folderId) || 'all');
-    this.setData({ selectedFolderId: folderId }, () => this.applyPhotoFilter());
+    this.setData({ selectedFolderId: folderId }, () => {
+      this.applyPhotoFilter();
+      this.preparePhotoThumbnails();
+    });
   },
 
   onFolderLongPress(e) {
@@ -391,34 +388,30 @@ Page({
   applyPhotoFilter() {
     const { allPhotos, selectedFolderId } = this.data;
     const selectedSet = new Set((this.data.selectedPhotoIds || []).map((id) => Number(id)));
-    if (selectedFolderId === 'all') {
-      this.setData({
-        photos: allPhotos.map((item) => ({
+
+    const withUi = (items) =>
+      items.map((item) => {
+        const photoId = Number(item.id);
+        return {
           ...item,
-          checked: selectedSet.has(Number(item.id))
-        }))
+          displayPath: this.thumbnailCache[photoId] || '',
+          checked: selectedSet.has(photoId)
+        };
       });
+
+    if (selectedFolderId === 'all') {
+      this.setData({ photos: withUi(allPhotos) });
       return;
     }
     if (selectedFolderId === UNCLASSIFIED_KEY) {
       this.setData({
-        photos: allPhotos
-          .filter((item) => !item.folderId)
-          .map((item) => ({
-            ...item,
-            checked: selectedSet.has(Number(item.id))
-          }))
+        photos: withUi(allPhotos.filter((item) => !item.folderId))
       });
       return;
     }
     const targetId = Number(selectedFolderId);
     this.setData({
-      photos: allPhotos
-        .filter((item) => Number(item.folderId || 0) === targetId)
-        .map((item) => ({
-          ...item,
-          checked: selectedSet.has(Number(item.id))
-        }))
+      photos: withUi(allPhotos.filter((item) => Number(item.folderId || 0) === targetId))
     });
   },
 
@@ -450,7 +443,10 @@ Page({
           pendingFolderName: '',
           folderEditorVisible: false
         },
-        () => this.applyPhotoFilter()
+        () => {
+          this.applyPhotoFilter();
+          this.preparePhotoThumbnails();
+        }
       );
       wx.showToast({ title: '已创建', icon: 'success' });
     } catch (error) {
