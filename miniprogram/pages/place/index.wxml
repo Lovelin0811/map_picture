@@ -72,9 +72,15 @@
   </view>
 
   <view wx:if="{{selectionMode}}" class="batch-bar">
-    <text class="batch-btn" bindtap="onCancelSelectionMode">取消</text>
-    <text class="batch-btn" bindtap="onBatchMoveToFolder">移动到文件夹</text>
-    <text class="batch-btn danger" bindtap="onBatchDeletePhotos">删除</text>
+    <view class="batch-chip ghost" bindtap="onCancelSelectionMode">
+      <text class="batch-chip-text">取消</text>
+    </view>
+    <view class="batch-chip primary" bindtap="onBatchMoveToFolder">
+      <text class="batch-chip-text">移动到文件夹</text>
+    </view>
+    <view class="batch-chip danger" bindtap="onBatchDeletePhotos">
+      <text class="batch-chip-text">删除</text>
+    </view>
   </view>
 
   <view class="fab" bindtap="onAddPhoto">

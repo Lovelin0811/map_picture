@@ -188,25 +188,59 @@
 
 .batch-bar {
   position: fixed;
-  left: 24rpx;
-  right: 24rpx;
-  bottom: 24rpx;
-  background: #ffffff;
-  border-radius: 16rpx;
-  box-shadow: 0 10rpx 22rpx rgba(15, 23, 42, 0.14);
-  padding: 14rpx 18rpx;
+  left: 20rpx;
+  right: 20rpx;
+  bottom: 22rpx;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1rpx solid rgba(226, 232, 240, 0.9);
+  border-radius: 28rpx;
+  box-shadow: 0 14rpx 28rpx rgba(15, 23, 42, 0.18);
+  padding: 14rpx;
   display: flex;
-  justify-content: space-between;
+  gap: 12rpx;
   z-index: 110;
 }
 
-.batch-btn {
-  font-size: 25rpx;
-  color: #0f766e;
+.batch-chip {
+  flex: 1;
+  height: 70rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
-.batch-btn.danger {
-  color: #dc2626;
+.batch-chip-text {
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.batch-chip.ghost {
+  background: #f8fafc;
+  border: 1rpx solid #dbe3ef;
+}
+
+.batch-chip.ghost .batch-chip-text {
+  color: #475569;
+}
+
+.batch-chip.primary {
+  background: linear-gradient(135deg, #0f766e, #0d9488);
+  box-shadow: 0 6rpx 12rpx rgba(13, 148, 136, 0.32);
+}
+
+.batch-chip.primary .batch-chip-text {
+  color: #ffffff;
+}
+
+.batch-chip.danger {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  box-shadow: 0 6rpx 12rpx rgba(239, 68, 68, 0.28);
+}
+
+.batch-chip.danger .batch-chip-text {
+  color: #ffffff;
 }
 
 .fab {
