@@ -150,14 +150,6 @@ Page({
     wx.previewImage({ current: path, urls: all });
   },
 
-  onToggleSelectionMode() {
-    const next = !this.data.selectionMode;
-    this.setData({
-      selectionMode: next,
-      selectedPhotoIds: next ? this.data.selectedPhotoIds : []
-    }, () => this.applyPhotoFilter());
-  },
-
   togglePhotoSelection(id) {
     const photoId = Number(id);
     if (!Number.isInteger(photoId) || photoId <= 0) {
@@ -172,13 +164,33 @@ Page({
     this.setData({ selectedPhotoIds: Array.from(selected) }, () => this.applyPhotoFilter());
   },
 
-  onSelectAllPhotos() {
-    const allIds = (this.data.photos || []).map((item) => Number(item.id)).filter((id) => Number.isInteger(id));
-    this.setData({ selectedPhotoIds: allIds }, () => this.applyPhotoFilter());
+  enterSelectionMode(initialPhotoId) {
+    const selected = [];
+    const id = Number(initialPhotoId);
+    if (Number.isInteger(id) && id > 0) {
+      selected.push(id);
+    }
+    this.setData(
+      {
+        selectionMode: true,
+        selectedPhotoIds: selected
+      },
+      () => this.applyPhotoFilter()
+    );
   },
 
-  onClearSelectedPhotos() {
-    this.setData({ selectedPhotoIds: [] }, () => this.applyPhotoFilter());
+  exitSelectionMode() {
+    this.setData(
+      {
+        selectionMode: false,
+        selectedPhotoIds: []
+      },
+      () => this.applyPhotoFilter()
+    );
+  },
+
+  onCancelSelectionMode() {
+    this.exitSelectionMode();
   },
 
   async preparePhotoThumbnails() {
@@ -237,16 +249,7 @@ Page({
       this.togglePhotoSelection(id);
       return;
     }
-    wx.showActionSheet({
-      itemList: ['移动到文件夹', '删除照片'],
-      success: (res) => {
-        if (res.tapIndex === 0) {
-          this.chooseFolderForPhoto(id);
-          return;
-        }
-        this.confirmDeletePhoto(id);
-      }
-    });
+    this.enterSelectionMode(id);
   },
 
   confirmDeletePhoto(id) {
@@ -285,12 +288,38 @@ Page({
         const results = await Promise.allSettled(ids.map((id) => removePhoto(id)));
         const successCount = results.filter((item) => item.status === 'fulfilled').length;
         await this.refreshAllData();
-        this.setData({ selectedPhotoIds: [] }, () => this.applyPhotoFilter());
+        this.exitSelectionMode();
         if (successCount === ids.length) {
           wx.showToast({ title: `已删除${successCount}张`, icon: 'success' });
           return;
         }
         wx.showToast({ title: `删除成功${successCount}/${ids.length}`, icon: 'none' });
+      }
+    });
+  },
+
+  onBatchMoveToFolder() {
+    const ids = (this.data.selectedPhotoIds || []).filter((id) => Number.isInteger(id) && id > 0);
+    if (!ids.length) {
+      wx.showToast({ title: '请先选择照片', icon: 'none' });
+      return;
+    }
+    const { folders } = this.data;
+    const folderOptions = folders.map((item) => item.name);
+    const options = ['移出文件夹', ...folderOptions];
+    wx.showActionSheet({
+      itemList: options,
+      success: async (res) => {
+        const folderId = res.tapIndex === 0 ? null : folders[res.tapIndex - 1].id;
+        const results = await Promise.allSettled(ids.map((id) => assignPhotoToFolder(id, folderId)));
+        const successCount = results.filter((item) => item.status === 'fulfilled').length;
+        await this.refreshAllData();
+        this.exitSelectionMode();
+        if (successCount === ids.length) {
+          wx.showToast({ title: `已移动${successCount}张`, icon: 'success' });
+          return;
+        }
+        wx.showToast({ title: `移动成功${successCount}/${ids.length}`, icon: 'none' });
       }
     });
   },

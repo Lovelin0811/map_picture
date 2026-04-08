@@ -1,12 +1,7 @@
 <view class="container">
   <view class="header card">
     <text class="title">{{placeTitle}}</text>
-    <view class="selection-tools">
-      <text class="selection-btn" bindtap="onToggleSelectionMode">
-        {{selectionMode ? '退出多选' : '多选删除'}}
-      </text>
-      <text wx:if="{{selectionMode}}" class="selection-count">已选 {{selectedPhotoIds.length}}</text>
-    </view>
+    <text wx:if="{{selectionMode}}" class="selection-count">已选 {{selectedPhotoIds.length}} 张</text>
   </view>
 
   <view class="folder-card card">
@@ -56,7 +51,7 @@
 
   <view wx:if="{{photos.length === 0}}" class="empty card">
     <text class="empty-title">这里还没有照片</text>
-    <text class="empty-tip">点击右上角 + 添加，或长按照片移动到文件夹。</text>
+    <text class="empty-tip">点击右上角 + 添加，或长按照片进入选择模式。</text>
   </view>
 
   <view wx:if="{{photos.length > 0}}" class="grid">
@@ -77,9 +72,9 @@
   </view>
 
   <view wx:if="{{selectionMode}}" class="batch-bar">
-    <text class="batch-btn" bindtap="onSelectAllPhotos">全选</text>
-    <text class="batch-btn" bindtap="onClearSelectedPhotos">清空</text>
-    <text class="batch-btn danger" bindtap="onBatchDeletePhotos">删除已选</text>
+    <text class="batch-btn" bindtap="onCancelSelectionMode">取消</text>
+    <text class="batch-btn" bindtap="onBatchMoveToFolder">移动到文件夹</text>
+    <text class="batch-btn danger" bindtap="onBatchDeletePhotos">删除</text>
   </view>
 
   <view class="fab" bindtap="onAddPhoto">

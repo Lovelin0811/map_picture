@@ -21,17 +21,6 @@
   margin-bottom: 8rpx;
 }
 
-.selection-tools {
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-}
-
-.selection-btn {
-  font-size: 24rpx;
-  color: #0f766e;
-}
-
 .selection-count {
   font-size: 22rpx;
   color: #64748b;
