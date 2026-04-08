@@ -16,10 +16,13 @@ function makeUrl(path) {
 
 function request(path, { method = 'GET', data = null, headers = {} } = {}) {
   return new Promise((resolve, reject) => {
+    const hasBody = data !== null && data !== undefined;
     const finalHeaders = {
-      'content-type': 'application/json',
       ...headers
     };
+    if (hasBody) {
+      finalHeaders['content-type'] = 'application/json';
+    }
     if (authToken) {
       finalHeaders.Authorization = `Bearer ${authToken}`;
     }
@@ -27,7 +30,7 @@ function request(path, { method = 'GET', data = null, headers = {} } = {}) {
     wx.request({
       url: makeUrl(path),
       method,
-      data,
+      data: hasBody ? data : undefined,
       header: finalHeaders,
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
