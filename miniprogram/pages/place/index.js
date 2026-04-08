@@ -29,6 +29,7 @@ Page({
       placeTitle,
       province
     });
+    this.thumbnailCache = {};
   },
 
   async onShow() {
@@ -68,9 +69,13 @@ Page({
       const photos = await getPhotosByProvince(province);
       const allPhotos = photos.map((item) => ({
         ...item,
-        timeText: formatDate(item.createdAt)
+        timeText: formatDate(item.createdAt),
+        displayPath: item.filePath
       }));
-      this.setData({ allPhotos }, () => this.applyPhotoFilter());
+      this.setData({ allPhotos }, () => {
+        this.applyPhotoFilter();
+        this.preparePhotoThumbnails();
+      });
     } catch (error) {
       wx.showToast({ title: '加载照片失败', icon: 'none' });
     }
@@ -118,8 +123,55 @@ Page({
       return;
     }
 
-    const all = this.data.photos.map((item) => item.filePath);
+    const all = this.data.photos.map((item) => item.displayPath || item.filePath);
     wx.previewImage({ current: path, urls: all });
+  },
+
+  async preparePhotoThumbnails() {
+    const source = this.data.allPhotos || [];
+    if (!source.length) {
+      return;
+    }
+    const updated = await Promise.all(
+      source.map(async (item) => {
+        const remotePath = item.filePath;
+        if (!remotePath) {
+          return item;
+        }
+        if (this.thumbnailCache[remotePath]) {
+          return {
+            ...item,
+            displayPath: this.thumbnailCache[remotePath]
+          };
+        }
+        const localPath = await this.downloadToTempPath(remotePath);
+        if (localPath) {
+          this.thumbnailCache[remotePath] = localPath;
+        }
+        return {
+          ...item,
+          displayPath: localPath || remotePath
+        };
+      })
+    );
+    this.setData({ allPhotos: updated }, () => this.applyPhotoFilter());
+  },
+
+  downloadToTempPath(url) {
+    return new Promise((resolve) => {
+      wx.downloadFile({
+        url,
+        timeout: 10000,
+        success: (res) => {
+          if (res.statusCode >= 200 && res.statusCode < 300 && res.tempFilePath) {
+            resolve(res.tempFilePath);
+            return;
+          }
+          resolve('');
+        },
+        fail: () => resolve('')
+      });
+    });
   },
 
   async onPhotoLongPress(e) {
