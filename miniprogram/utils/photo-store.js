@@ -16,9 +16,41 @@ function getPhotosByProvince(provinceName) {
       id: item.id,
       province: item.province,
       filePath: buildProtectedPhotoUrl(item.id),
-      createdAt: item.createdAt
+      createdAt: item.createdAt,
+      folderId: item.folderId ? Number(item.folderId) : null,
+      folderName: item.folderName || ''
     }))
   );
+}
+
+function getFoldersByProvince(provinceName) {
+  return request(`/api/folders?province=${encodeURIComponent(provinceName)}`, { method: 'GET' }).then((rows) =>
+    rows.map((item) => ({
+      id: Number(item.id),
+      province: item.province,
+      name: item.name,
+      count: Number(item.count || 0)
+    }))
+  );
+}
+
+function createFolder(province, name) {
+  return request('/api/folders', {
+    method: 'POST',
+    data: { province, name }
+  }).then((item) => ({
+    id: Number(item.id),
+    province: item.province,
+    name: item.name,
+    count: Number(item.count || 0)
+  }));
+}
+
+function assignPhotoToFolder(photoId, folderId) {
+  return request(`/api/photos/${photoId}/folder`, {
+    method: 'PATCH',
+    data: { folderId: folderId || null }
+  });
 }
 
 function uploadPhoto(filePath, province) {
@@ -67,6 +99,9 @@ function formatDate(timestamp) {
 module.exports = {
   fetchProvinceStats,
   getPhotosByProvince,
+  getFoldersByProvince,
+  createFolder,
+  assignPhotoToFolder,
   uploadPhoto,
   removePhoto,
   formatDate

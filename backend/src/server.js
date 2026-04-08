@@ -33,6 +33,17 @@ function now() {
   return Date.now();
 }
 
+function parseOptionalFolderId(rawValue) {
+  if (rawValue === null || rawValue === undefined || rawValue === '') {
+    return null;
+  }
+  const value = Number(rawValue);
+  if (!Number.isInteger(value) || value <= 0) {
+    return undefined;
+  }
+  return value;
+}
+
 function getTokenFromRequest(req, { allowQuery = false } = {}) {
   const authHeader = req.headers.authorization || '';
   const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
@@ -189,14 +200,78 @@ app.get('/api/photos', authMiddleware, async (req, res) => {
   }
   const rows = await all(
     `
-    SELECT id, province, file_url as fileUrl, created_at as createdAt
-    FROM photos
-    WHERE user_id = ? AND province = ?
-    ORDER BY created_at DESC
+    SELECT p.id, p.province, p.file_url as fileUrl, p.created_at as createdAt,
+           p.folder_id as folderId, f.name as folderName
+    FROM photos p
+    LEFT JOIN folders f ON f.id = p.folder_id AND f.user_id = p.user_id
+    WHERE p.user_id = ? AND p.province = ?
+    ORDER BY p.created_at DESC
   `,
     [req.auth.userId, province]
   );
   res.json(rows);
+});
+
+app.get('/api/folders', authMiddleware, async (req, res) => {
+  const province = String(req.query.province || '').trim();
+  if (!province) {
+    res.status(400).json({ message: '缺少 province' });
+    return;
+  }
+  const rows = await all(
+    `
+    SELECT f.id, f.name, f.province, f.created_at as createdAt, COUNT(p.id) as count
+    FROM folders f
+    LEFT JOIN photos p ON p.folder_id = f.id
+    WHERE f.user_id = ? AND f.province = ?
+    GROUP BY f.id
+    ORDER BY f.created_at ASC
+  `,
+    [req.auth.userId, province]
+  );
+  res.json(rows.map((row) => ({ ...row, count: Number(row.count || 0) })));
+});
+
+app.post('/api/folders', authMiddleware, async (req, res) => {
+  const province = String((req.body && req.body.province) || '').trim();
+  const name = String((req.body && req.body.name) || '').trim();
+  if (!province) {
+    res.status(400).json({ message: '缺少 province' });
+    return;
+  }
+  if (!name) {
+    res.status(400).json({ message: '缺少文件夹名称' });
+    return;
+  }
+  if (name.length > 24) {
+    res.status(400).json({ message: '文件夹名称不能超过24个字符' });
+    return;
+  }
+
+  const existed = await get(
+    `SELECT id FROM folders WHERE user_id = ? AND province = ? AND name = ?`,
+    [req.auth.userId, province, name]
+  );
+  if (existed) {
+    res.status(409).json({ message: '文件夹已存在' });
+    return;
+  }
+
+  const createdAt = now();
+  const result = await run(
+    `
+    INSERT INTO folders(user_id, province, name, created_at)
+    VALUES(?, ?, ?, ?)
+  `,
+    [req.auth.userId, province, name, createdAt]
+  );
+  res.json({
+    id: result.lastID,
+    province,
+    name,
+    createdAt,
+    count: 0
+  });
 });
 
 app.get('/api/photos/file/:id', async (req, res) => {
@@ -261,23 +336,76 @@ app.post('/api/photos/upload', authMiddleware, upload.single('file'), async (req
       fs.writeFileSync(filePath, Buffer.from(fileBase64, 'base64'));
       fileUrl = `/uploads/${filename}`;
     }
+    const folderId = parseOptionalFolderId(req.body && req.body.folderId);
+    if (folderId === undefined) {
+      res.status(400).json({ message: 'folderId 无效' });
+      return;
+    }
+    if (folderId) {
+      const folder = await get(
+        `SELECT id FROM folders WHERE id = ? AND user_id = ? AND province = ?`,
+        [folderId, req.auth.userId, province]
+      );
+      if (!folder) {
+        res.status(400).json({ message: '文件夹不存在' });
+        return;
+      }
+    }
+
     const createdAt = now();
     const result = await run(
       `
-      INSERT INTO photos(user_id, province, file_url, file_path, created_at)
-      VALUES(?, ?, ?, ?, ?)
+      INSERT INTO photos(user_id, province, file_url, file_path, created_at, folder_id)
+      VALUES(?, ?, ?, ?, ?, ?)
     `,
-      [req.auth.userId, province, fileUrl, filePath, createdAt]
+      [req.auth.userId, province, fileUrl, filePath, createdAt, folderId]
     );
     res.json({
       id: result.lastID,
       province,
       fileUrl,
-      createdAt
+      createdAt,
+      folderId
     });
   } catch (error) {
     res.status(500).json({ message: '上传失败', detail: error.message });
   }
+});
+
+app.patch('/api/photos/:id/folder', authMiddleware, async (req, res) => {
+  const photoId = Number(req.params.id);
+  if (!Number.isFinite(photoId)) {
+    res.status(400).json({ message: '无效照片ID' });
+    return;
+  }
+  const folderId = parseOptionalFolderId(req.body && req.body.folderId);
+  if (folderId === undefined) {
+    res.status(400).json({ message: 'folderId 无效' });
+    return;
+  }
+
+  const photo = await get(
+    `SELECT id, province FROM photos WHERE id = ? AND user_id = ?`,
+    [photoId, req.auth.userId]
+  );
+  if (!photo) {
+    res.status(404).json({ message: '照片不存在' });
+    return;
+  }
+
+  if (folderId) {
+    const folder = await get(
+      `SELECT id FROM folders WHERE id = ? AND user_id = ? AND province = ?`,
+      [folderId, req.auth.userId, photo.province]
+    );
+    if (!folder) {
+      res.status(400).json({ message: '文件夹不存在或不属于当前省份' });
+      return;
+    }
+  }
+
+  await run(`UPDATE photos SET folder_id = ? WHERE id = ?`, [folderId, photoId]);
+  res.json({ ok: true, id: photoId, folderId });
 });
 
 app.delete('/api/photos/:id', authMiddleware, async (req, res) => {

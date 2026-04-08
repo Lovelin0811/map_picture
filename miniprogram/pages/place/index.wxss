@@ -31,6 +31,87 @@
   text-align: center;
 }
 
+.folder-card {
+  padding-bottom: 16rpx;
+}
+
+.folder-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.folder-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.folder-add {
+  font-size: 24rpx;
+  color: #0f766e;
+}
+
+.folder-editor {
+  margin-top: 12rpx;
+  padding: 12rpx;
+  border-radius: 12rpx;
+  background: #f8fafc;
+}
+
+.folder-input {
+  height: 70rpx;
+  padding: 0 18rpx;
+  border-radius: 10rpx;
+  background: #ffffff;
+  border: 1rpx solid #e2e8f0;
+  font-size: 26rpx;
+}
+
+.folder-editor-actions {
+  margin-top: 10rpx;
+  display: flex;
+  justify-content: flex-end;
+  gap: 22rpx;
+}
+
+.folder-action {
+  font-size: 24rpx;
+}
+
+.folder-action.cancel {
+  color: #64748b;
+}
+
+.folder-action.submit {
+  color: #0f766e;
+}
+
+.folder-scroll {
+  margin-top: 12rpx;
+  white-space: nowrap;
+}
+
+.folder-list {
+  display: inline-flex;
+  gap: 10rpx;
+  padding-bottom: 2rpx;
+}
+
+.folder-pill {
+  display: inline-block;
+  padding: 10rpx 16rpx;
+  border-radius: 999rpx;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 22rpx;
+}
+
+.folder-pill.active {
+  background: #0f766e;
+  color: #ffffff;
+}
+
 .empty-title {
   display: block;
   font-size: 30rpx;
@@ -66,6 +147,14 @@
   margin-top: 6rpx;
   font-size: 22rpx;
   color: #64748b;
+  text-align: center;
+}
+
+.folder-tag {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 21rpx;
+  color: #0f766e;
   text-align: center;
 }
 

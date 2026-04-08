@@ -79,6 +79,28 @@ async function initDb() {
       FOREIGN KEY(user_id) REFERENCES users(id)
     )
   `);
+
+  await run(`
+    CREATE TABLE IF NOT EXISTS folders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      province TEXT NOT NULL,
+      name TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE(user_id, province, name),
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    )
+  `);
+
+  const photoColumns = await all(`PRAGMA table_info(photos)`);
+  const hasFolderId = photoColumns.some((column) => column.name === 'folder_id');
+  if (!hasFolderId) {
+    await run(`ALTER TABLE photos ADD COLUMN folder_id INTEGER`);
+  }
+
+  await run(`CREATE INDEX IF NOT EXISTS idx_photos_user_province ON photos(user_id, province)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_photos_folder_id ON photos(folder_id)`);
+  await run(`CREATE INDEX IF NOT EXISTS idx_folders_user_province ON folders(user_id, province)`);
 }
 
 module.exports = {
