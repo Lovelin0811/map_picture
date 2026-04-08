@@ -148,7 +148,12 @@ Page({
         }
         removePhoto(id)
           .then(() => this.refreshAllData())
-          .catch(() => wx.showToast({ title: '删除失败', icon: 'none' }));
+          .catch((error) =>
+            wx.showToast({
+              title: (error && error.message) || '删除失败',
+              icon: 'none'
+            })
+          );
       }
     });
   },

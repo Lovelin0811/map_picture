@@ -425,24 +425,37 @@ app.patch('/api/photos/:id/folder', authMiddleware, async (req, res) => {
 });
 
 app.delete('/api/photos/:id', authMiddleware, async (req, res) => {
-  const photoId = Number(req.params.id);
-  if (!Number.isFinite(photoId)) {
-    res.status(400).json({ message: '无效照片ID' });
-    return;
+  try {
+    const photoId = Number(req.params.id);
+    if (!Number.isInteger(photoId) || photoId <= 0) {
+      res.status(400).json({ message: '无效照片ID' });
+      return;
+    }
+
+    const target = await get(
+      `SELECT id, file_path as filePath FROM photos WHERE id = ? AND user_id = ?`,
+      [photoId, req.auth.userId]
+    );
+    if (!target) {
+      res.status(404).json({ message: '照片不存在' });
+      return;
+    }
+
+    await run(`DELETE FROM photos WHERE id = ?`, [photoId]);
+
+    if (target.filePath && fs.existsSync(target.filePath)) {
+      try {
+        fs.unlinkSync(target.filePath);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.warn('unlink photo file failed:', error.message);
+      }
+    }
+
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ message: '删除失败', detail: error.message });
   }
-  const target = await get(
-    `SELECT id, file_path as filePath FROM photos WHERE id = ? AND user_id = ?`,
-    [photoId, req.auth.userId]
-  );
-  if (!target) {
-    res.status(404).json({ message: '照片不存在' });
-    return;
-  }
-  await run(`DELETE FROM photos WHERE id = ?`, [photoId]);
-  if (target.filePath && fs.existsSync(target.filePath)) {
-    fs.unlinkSync(target.filePath);
-  }
-  res.json({ ok: true });
 });
 
 initDb()
