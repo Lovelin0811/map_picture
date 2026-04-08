@@ -1,6 +1,12 @@
 <view class="container">
   <view class="header card">
     <text class="title">{{placeTitle}}</text>
+    <view class="selection-tools">
+      <text class="selection-btn" bindtap="onToggleSelectionMode">
+        {{selectionMode ? '退出多选' : '多选删除'}}
+      </text>
+      <text wx:if="{{selectionMode}}" class="selection-count">已选 {{selectedPhotoIds.length}}</text>
+    </view>
   </view>
 
   <view class="folder-card card">
@@ -60,13 +66,20 @@
         src="{{item.displayPath || item.filePath}}"
         mode="aspectFill"
         data-path="{{item.displayPath || item.filePath}}"
-        bindtap="onPreview"
         data-id="{{item.id}}"
+        bindtap="onPhotoTap"
         bindlongpress="onPhotoLongPress"
       />
+      <view wx:if="{{selectionMode}}" class="check-dot {{item.checked ? 'checked' : ''}}"></view>
       <text wx:if="{{item.folderName}}" class="folder-tag">{{item.folderName}}</text>
       <text class="time">{{item.timeText}}</text>
     </view>
+  </view>
+
+  <view wx:if="{{selectionMode}}" class="batch-bar">
+    <text class="batch-btn" bindtap="onSelectAllPhotos">全选</text>
+    <text class="batch-btn" bindtap="onClearSelectedPhotos">清空</text>
+    <text class="batch-btn danger" bindtap="onBatchDeletePhotos">删除已选</text>
   </view>
 
   <view class="fab" bindtap="onAddPhoto">

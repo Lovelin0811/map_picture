@@ -18,7 +18,9 @@ Page({
     folders: [],
     selectedFolderId: 'all',
     folderEditorVisible: false,
-    pendingFolderName: ''
+    pendingFolderName: '',
+    selectionMode: false,
+    selectedPhotoIds: []
   },
 
   onLoad(options) {
@@ -95,18 +97,31 @@ Page({
     }
 
     try {
-      const media = await this.chooseImage();
-      if (!media || !media.tempFilePath) {
+      const medias = await this.chooseImages();
+      if (!medias || !medias.length) {
         return;
       }
 
       const targetFolderId = selectedFolderId === 'all' ? null : Number(selectedFolderId);
       const targetFolder = folders.find((item) => String(item.id) === String(selectedFolderId));
-      await uploadPhoto(media.tempFilePath, province, targetFolderId);
+      let successCount = 0;
+      for (const media of medias) {
+        if (!media || !media.tempFilePath) {
+          continue;
+        }
+        try {
+          await uploadPhoto(media.tempFilePath, province, targetFolderId);
+          successCount += 1;
+        } catch (_error) {}
+      }
+      if (!successCount) {
+        wx.showToast({ title: '上传失败', icon: 'none' });
+        return;
+      }
 
       await this.refreshAllData();
       wx.showToast({
-        title: targetFolder ? `已添加到${targetFolder.name}` : '已添加',
+        title: targetFolder ? `已上传${successCount}张到${targetFolder.name}` : `已上传${successCount}张`,
         icon: 'success'
       });
     } catch (error) {
@@ -117,14 +132,53 @@ Page({
     }
   },
 
-  onPreview(e) {
-    const { path } = e.currentTarget.dataset;
+  onPhotoTap(e) {
+    const { id, path } = e.currentTarget.dataset;
+    if (this.data.selectionMode) {
+      this.togglePhotoSelection(id);
+      return;
+    }
+    this.onPreview(path);
+  },
+
+  onPreview(path) {
     if (!path) {
       return;
     }
 
     const all = this.data.photos.map((item) => item.displayPath || item.filePath);
     wx.previewImage({ current: path, urls: all });
+  },
+
+  onToggleSelectionMode() {
+    const next = !this.data.selectionMode;
+    this.setData({
+      selectionMode: next,
+      selectedPhotoIds: next ? this.data.selectedPhotoIds : []
+    }, () => this.applyPhotoFilter());
+  },
+
+  togglePhotoSelection(id) {
+    const photoId = Number(id);
+    if (!Number.isInteger(photoId) || photoId <= 0) {
+      return;
+    }
+    const selected = new Set(this.data.selectedPhotoIds || []);
+    if (selected.has(photoId)) {
+      selected.delete(photoId);
+    } else {
+      selected.add(photoId);
+    }
+    this.setData({ selectedPhotoIds: Array.from(selected) }, () => this.applyPhotoFilter());
+  },
+
+  onSelectAllPhotos() {
+    const allIds = (this.data.photos || []).map((item) => Number(item.id)).filter((id) => Number.isInteger(id));
+    this.setData({ selectedPhotoIds: allIds }, () => this.applyPhotoFilter());
+  },
+
+  onClearSelectedPhotos() {
+    this.setData({ selectedPhotoIds: [] }, () => this.applyPhotoFilter());
   },
 
   async preparePhotoThumbnails() {
@@ -179,6 +233,10 @@ Page({
     if (!id) {
       return;
     }
+    if (this.data.selectionMode) {
+      this.togglePhotoSelection(id);
+      return;
+    }
     wx.showActionSheet({
       itemList: ['移动到文件夹', '删除照片'],
       success: (res) => {
@@ -207,6 +265,32 @@ Page({
               icon: 'none'
             })
           );
+      }
+    });
+  },
+
+  onBatchDeletePhotos() {
+    const ids = (this.data.selectedPhotoIds || []).filter((id) => Number.isInteger(id) && id > 0);
+    if (!ids.length) {
+      wx.showToast({ title: '请先选择照片', icon: 'none' });
+      return;
+    }
+    wx.showModal({
+      title: '批量删除照片',
+      content: `确定删除已选中的 ${ids.length} 张照片吗？`,
+      success: async (res) => {
+        if (!res.confirm) {
+          return;
+        }
+        const results = await Promise.allSettled(ids.map((id) => removePhoto(id)));
+        const successCount = results.filter((item) => item.status === 'fulfilled').length;
+        await this.refreshAllData();
+        this.setData({ selectedPhotoIds: [] }, () => this.applyPhotoFilter());
+        if (successCount === ids.length) {
+          wx.showToast({ title: `已删除${successCount}张`, icon: 'success' });
+          return;
+        }
+        wx.showToast({ title: `删除成功${successCount}/${ids.length}`, icon: 'none' });
       }
     });
   },
@@ -280,13 +364,24 @@ Page({
 
   applyPhotoFilter() {
     const { allPhotos, selectedFolderId } = this.data;
+    const selectedSet = new Set((this.data.selectedPhotoIds || []).map((id) => Number(id)));
     if (selectedFolderId === 'all') {
-      this.setData({ photos: allPhotos });
+      this.setData({
+        photos: allPhotos.map((item) => ({
+          ...item,
+          checked: selectedSet.has(Number(item.id))
+        }))
+      });
       return;
     }
     const targetId = Number(selectedFolderId);
     this.setData({
-      photos: allPhotos.filter((item) => Number(item.folderId || 0) === targetId)
+      photos: allPhotos
+        .filter((item) => Number(item.folderId || 0) === targetId)
+        .map((item) => ({
+          ...item,
+          checked: selectedSet.has(Number(item.id))
+        }))
     });
   },
 
@@ -338,15 +433,17 @@ Page({
     });
   },
 
-  chooseImage() {
+  chooseImages() {
     return new Promise((resolve, reject) => {
       wx.chooseMedia({
-        count: 1,
+        count: 9,
         mediaType: ['image'],
         sourceType: ['camera', 'album'],
         success: (res) => {
-          const file = res.tempFiles && res.tempFiles[0];
-          resolve(file ? { tempFilePath: file.tempFilePath } : null);
+          const files = (res.tempFiles || []).map((file) => ({ tempFilePath: file.tempFilePath })).filter((file) =>
+            file && file.tempFilePath
+          );
+          resolve(files);
         },
         fail: reject
       });
