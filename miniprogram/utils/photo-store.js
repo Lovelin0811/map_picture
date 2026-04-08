@@ -1,9 +1,7 @@
 const { request, makeUrl, getAuthToken } = require('./api');
 
 function buildProtectedPhotoUrl(photoId) {
-  const token = getAuthToken();
-  const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : '';
-  return makeUrl(`/api/photos/file/${photoId}${tokenQuery}`);
+  return makeUrl(`/api/photos/file/${photoId}`);
 }
 
 function fetchProvinceStats() {
@@ -102,6 +100,29 @@ function removePhoto(photoId) {
   return request(`/api/photos/${photoId}`, { method: 'DELETE' });
 }
 
+function downloadPhotoToTemp(photoId) {
+  const token = getAuthToken();
+  return new Promise((resolve) => {
+    wx.downloadFile({
+      url: buildProtectedPhotoUrl(photoId),
+      timeout: 10000,
+      header: token
+        ? {
+            Authorization: `Bearer ${token}`
+          }
+        : {},
+      success: (res) => {
+        if (res.statusCode >= 200 && res.statusCode < 300 && res.tempFilePath) {
+          resolve(res.tempFilePath);
+          return;
+        }
+        resolve('');
+      },
+      fail: () => resolve('')
+    });
+  });
+}
+
 function formatDate(timestamp) {
   const d = new Date(timestamp);
   const pad = (n) => String(n).padStart(2, '0');
@@ -117,5 +138,6 @@ module.exports = {
   assignPhotoToFolder,
   uploadPhoto,
   removePhoto,
+  downloadPhotoToTemp,
   formatDate
 };

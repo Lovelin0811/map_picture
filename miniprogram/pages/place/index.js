@@ -6,6 +6,7 @@ const {
   assignPhotoToFolder,
   uploadPhoto,
   removePhoto,
+  downloadPhotoToTemp,
   formatDate
 } = require('../../utils/photo-store');
 
@@ -209,44 +210,31 @@ Page({
     }
     const updated = await Promise.all(
       source.map(async (item) => {
-        const remotePath = item.filePath;
-        if (!remotePath) {
+        const photoId = Number(item.id);
+        if (!photoId) {
           return item;
         }
-        if (this.thumbnailCache[remotePath]) {
+        if (this.thumbnailCache[photoId]) {
           return {
             ...item,
-            displayPath: this.thumbnailCache[remotePath]
+            displayPath: this.thumbnailCache[photoId]
           };
         }
-        const localPath = await this.downloadToTempPath(remotePath);
+        const localPath = await this.downloadToTempPath(photoId);
         if (localPath) {
-          this.thumbnailCache[remotePath] = localPath;
+          this.thumbnailCache[photoId] = localPath;
         }
         return {
           ...item,
-          displayPath: localPath || remotePath
+          displayPath: localPath || ''
         };
       })
     );
     this.setData({ allPhotos: updated }, () => this.applyPhotoFilter());
   },
 
-  downloadToTempPath(url) {
-    return new Promise((resolve) => {
-      wx.downloadFile({
-        url,
-        timeout: 10000,
-        success: (res) => {
-          if (res.statusCode >= 200 && res.statusCode < 300 && res.tempFilePath) {
-            resolve(res.tempFilePath);
-            return;
-          }
-          resolve('');
-        },
-        fail: () => resolve('')
-      });
-    });
+  downloadToTempPath(photoId) {
+    return downloadPhotoToTemp(photoId);
   },
 
   async onPhotoLongPress(e) {

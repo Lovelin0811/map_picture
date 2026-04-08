@@ -65,9 +65,9 @@
     <view wx:for="{{photos}}" wx:key="id" class="photo-wrap">
       <image
         class="photo"
-        src="{{item.displayPath || item.filePath}}"
+        src="{{item.displayPath}}"
         mode="aspectFill"
-        data-path="{{item.displayPath || item.filePath}}"
+        data-path="{{item.displayPath}}"
         data-id="{{item.id}}"
         bindtap="onPhotoTap"
         bindlongpress="onPhotoLongPress"

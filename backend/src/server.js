@@ -10,6 +10,10 @@ const { run, get, all, initDb } = require('./db');
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const sessionTtlMs = 7 * 24 * 60 * 60 * 1000;
+const corsAllowList = String(process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((item) => item.trim())
+  .filter(Boolean);
 
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -26,7 +30,21 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-app.use(cors());
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      if (corsAllowList.length === 0 || corsAllowList.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error('CORS blocked'));
+    }
+  })
+);
 app.use(express.json({ limit: '20mb' }));
 
 function now() {
@@ -58,14 +76,11 @@ function getMimeTypeByExt(filePath) {
   return mimeMap[ext] || 'application/octet-stream';
 }
 
-function getTokenFromRequest(req, { allowQuery = false } = {}) {
+function getTokenFromRequest(req) {
   const authHeader = req.headers.authorization || '';
   const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
   if (bearerToken) {
     return bearerToken;
-  }
-  if (allowQuery) {
-    return String((req.query && req.query.token) || '').trim();
   }
   return '';
 }
@@ -339,18 +354,7 @@ app.delete('/api/folders/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/photos/file/:id', async (req, res) => {
-  const token = getTokenFromRequest(req, { allowQuery: true });
-  if (!token) {
-    res.status(401).json({ message: '未登录' });
-    return;
-  }
-  const session = await getSessionByToken(token);
-  if (!session) {
-    res.status(401).json({ message: '登录已过期，请重新登录' });
-    return;
-  }
-
+app.get('/api/photos/file/:id', authMiddleware, async (req, res) => {
   const photoId = Number(req.params.id);
   if (!Number.isFinite(photoId)) {
     res.status(400).json({ message: '无效照片ID' });
@@ -359,7 +363,7 @@ app.get('/api/photos/file/:id', async (req, res) => {
 
   const target = await get(
     `SELECT file_path as filePath FROM photos WHERE id = ? AND user_id = ?`,
-    [photoId, session.userId]
+    [photoId, req.auth.userId]
   );
   if (!target || !target.filePath) {
     res.status(404).json({ message: '照片不存在' });
