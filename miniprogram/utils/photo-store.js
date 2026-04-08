@@ -53,14 +53,18 @@ function assignPhotoToFolder(photoId, folderId) {
   });
 }
 
-function uploadPhoto(filePath, province) {
+function uploadPhoto(filePath, province, folderId = null) {
   const token = getAuthToken();
+  const formData = { province };
+  if (folderId !== null && folderId !== undefined && folderId !== '') {
+    formData.folderId = String(folderId);
+  }
   return new Promise((resolve, reject) => {
     wx.uploadFile({
       url: makeUrl('/api/photos/upload'),
       filePath,
       name: 'file',
-      formData: { province },
+      formData,
       header: {
         Authorization: token ? `Bearer ${token}` : ''
       },
@@ -72,7 +76,8 @@ function uploadPhoto(filePath, province) {
               id: data.id,
               province: data.province,
               filePath: buildProtectedPhotoUrl(data.id),
-              createdAt: data.createdAt
+              createdAt: data.createdAt,
+              folderId: data.folderId ? Number(data.folderId) : null
             });
             return;
           }

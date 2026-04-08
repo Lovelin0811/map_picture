@@ -76,7 +76,7 @@ Page({
   },
 
   async onAddPhoto() {
-    const { province } = this.data;
+    const { province, selectedFolderId, folders } = this.data;
     if (!province) {
       wx.showToast({ title: '省份无效', icon: 'none' });
       return;
@@ -94,10 +94,15 @@ Page({
         return;
       }
 
-      await uploadPhoto(media.tempFilePath, province);
+      const targetFolderId = selectedFolderId === 'all' ? null : Number(selectedFolderId);
+      const targetFolder = folders.find((item) => String(item.id) === String(selectedFolderId));
+      await uploadPhoto(media.tempFilePath, province, targetFolderId);
 
       await this.refreshAllData();
-      wx.showToast({ title: '已添加', icon: 'success' });
+      wx.showToast({
+        title: targetFolder ? `已添加到${targetFolder.name}` : '已添加',
+        icon: 'success'
+      });
     } catch (error) {
       const message = error && error.errMsg ? error.errMsg : '保存失败';
       if (!String(message).includes('cancel')) {
