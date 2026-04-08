@@ -190,15 +190,26 @@ Page({
     if (!Number.isInteger(folderId) || folderId <= 0) {
       return;
     }
+    wx.showActionSheet({
+      itemList: ['保存照片（移到全部）', '不保存照片（一起删除）'],
+      success: (res) => {
+        const keepPhotos = res.tapIndex === 0;
+        this.confirmDeleteFolder(folderId, folderName, keepPhotos);
+      }
+    });
+  },
+
+  confirmDeleteFolder(folderId, folderName, keepPhotos) {
+    const actionText = keepPhotos ? '保留照片并移动到全部' : '删除文件夹内所有照片';
     wx.showModal({
       title: '删除文件夹',
-      content: `确认删除“${folderName || '该文件夹'}”？\n其中照片会保留并移动到“全部”。`,
+      content: `确认删除“${folderName || '该文件夹'}”？\n将会${actionText}。`,
       success: async (res) => {
         if (!res.confirm) {
           return;
         }
         try {
-          await deleteFolder(folderId);
+          await deleteFolder(folderId, { keepPhotos });
           const needResetSelected = String(this.data.selectedFolderId) === String(folderId);
           if (needResetSelected) {
             this.setData({ selectedFolderId: 'all' });

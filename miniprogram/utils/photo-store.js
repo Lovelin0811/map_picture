@@ -46,8 +46,11 @@ function createFolder(province, name) {
   }));
 }
 
-function deleteFolder(folderId) {
-  return request(`/api/folders/${folderId}`, { method: 'DELETE' });
+function deleteFolder(folderId, { keepPhotos = true } = {}) {
+  return request(`/api/folders/${folderId}`, {
+    method: 'DELETE',
+    data: { keepPhotos: !!keepPhotos }
+  });
 }
 
 function assignPhotoToFolder(photoId, folderId) {

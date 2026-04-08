@@ -305,14 +305,34 @@ app.delete('/api/folders/:id', authMiddleware, async (req, res) => {
       return;
     }
 
-    await run(`UPDATE photos SET folder_id = NULL WHERE user_id = ? AND folder_id = ?`, [req.auth.userId, folderId]);
+    const keepPhotos = !(req.body && req.body.keepPhotos === false);
+    if (keepPhotos) {
+      await run(`UPDATE photos SET folder_id = NULL WHERE user_id = ? AND folder_id = ?`, [req.auth.userId, folderId]);
+    } else {
+      const photos = await all(`SELECT id, file_path as filePath FROM photos WHERE user_id = ? AND folder_id = ?`, [
+        req.auth.userId,
+        folderId
+      ]);
+      await run(`DELETE FROM photos WHERE user_id = ? AND folder_id = ?`, [req.auth.userId, folderId]);
+      photos.forEach((item) => {
+        if (item.filePath && fs.existsSync(item.filePath)) {
+          try {
+            fs.unlinkSync(item.filePath);
+          } catch (error) {
+            // eslint-disable-next-line no-console
+            console.warn('unlink folder photo failed:', error.message);
+          }
+        }
+      });
+    }
     await run(`DELETE FROM folders WHERE id = ? AND user_id = ?`, [folderId, req.auth.userId]);
 
     res.json({
       ok: true,
       id: folderId,
       province: target.province,
-      name: target.name
+      name: target.name,
+      keepPhotos
     });
   } catch (error) {
     res.status(500).json({ message: '删除文件夹失败', detail: error.message });
