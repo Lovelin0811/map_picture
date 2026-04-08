@@ -288,6 +288,37 @@ app.post('/api/folders', authMiddleware, async (req, res) => {
   });
 });
 
+app.delete('/api/folders/:id', authMiddleware, async (req, res) => {
+  try {
+    const folderId = Number(req.params.id);
+    if (!Number.isInteger(folderId) || folderId <= 0) {
+      res.status(400).json({ message: '无效文件夹ID' });
+      return;
+    }
+
+    const target = await get(
+      `SELECT id, province, name FROM folders WHERE id = ? AND user_id = ?`,
+      [folderId, req.auth.userId]
+    );
+    if (!target) {
+      res.status(404).json({ message: '文件夹不存在' });
+      return;
+    }
+
+    await run(`UPDATE photos SET folder_id = NULL WHERE user_id = ? AND folder_id = ?`, [req.auth.userId, folderId]);
+    await run(`DELETE FROM folders WHERE id = ? AND user_id = ?`, [folderId, req.auth.userId]);
+
+    res.json({
+      ok: true,
+      id: folderId,
+      province: target.province,
+      name: target.name
+    });
+  } catch (error) {
+    res.status(500).json({ message: '删除文件夹失败', detail: error.message });
+  }
+});
+
 app.get('/api/photos/file/:id', async (req, res) => {
   const token = getTokenFromRequest(req, { allowQuery: true });
   if (!token) {

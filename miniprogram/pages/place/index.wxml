@@ -8,6 +8,7 @@
       <text class="folder-title">文件夹</text>
       <text class="folder-add" bindtap="onToggleFolderEditor">+ 新建</text>
     </view>
+    <text class="folder-tip">长按文件夹可删除</text>
 
     <view wx:if="{{folderEditorVisible}}" class="folder-editor">
       <input
@@ -37,7 +38,9 @@
           wx:key="id"
           class="folder-pill {{selectedFolderId === item.folderKey ? 'active' : ''}}"
           data-folder-id="{{item.folderKey}}"
+          data-folder-name="{{item.name}}"
           bindtap="onSelectFolder"
+          bindlongpress="onFolderLongPress"
         >
           {{item.name}} ({{item.count}})
         </view>

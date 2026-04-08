@@ -2,6 +2,7 @@ const {
   getPhotosByProvince,
   getFoldersByProvince,
   createFolder,
+  deleteFolder,
   assignPhotoToFolder,
   uploadPhoto,
   removePhoto,
@@ -181,6 +182,37 @@ Page({
   onSelectFolder(e) {
     const folderId = String((e.currentTarget.dataset && e.currentTarget.dataset.folderId) || 'all');
     this.setData({ selectedFolderId: folderId }, () => this.applyPhotoFilter());
+  },
+
+  onFolderLongPress(e) {
+    const folderId = Number(e.currentTarget.dataset && e.currentTarget.dataset.folderId);
+    const folderName = String((e.currentTarget.dataset && e.currentTarget.dataset.folderName) || '');
+    if (!Number.isInteger(folderId) || folderId <= 0) {
+      return;
+    }
+    wx.showModal({
+      title: '删除文件夹',
+      content: `确认删除“${folderName || '该文件夹'}”？\n其中照片会保留并移动到“全部”。`,
+      success: async (res) => {
+        if (!res.confirm) {
+          return;
+        }
+        try {
+          await deleteFolder(folderId);
+          const needResetSelected = String(this.data.selectedFolderId) === String(folderId);
+          if (needResetSelected) {
+            this.setData({ selectedFolderId: 'all' });
+          }
+          await this.refreshAllData();
+          wx.showToast({ title: '文件夹已删除', icon: 'success' });
+        } catch (error) {
+          wx.showToast({
+            title: (error && error.message) || '删除文件夹失败',
+            icon: 'none'
+          });
+        }
+      }
+    });
   },
 
   applyPhotoFilter() {

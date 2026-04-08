@@ -46,6 +46,10 @@ function createFolder(province, name) {
   }));
 }
 
+function deleteFolder(folderId) {
+  return request(`/api/folders/${folderId}`, { method: 'DELETE' });
+}
+
 function assignPhotoToFolder(photoId, folderId) {
   return request(`/api/photos/${photoId}/folder`, {
     method: 'PATCH',
@@ -106,6 +110,7 @@ module.exports = {
   getPhotosByProvince,
   getFoldersByProvince,
   createFolder,
+  deleteFolder,
   assignPhotoToFolder,
   uploadPhoto,
   removePhoto,
