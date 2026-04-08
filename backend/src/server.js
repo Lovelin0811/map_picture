@@ -44,6 +44,20 @@ function parseOptionalFolderId(rawValue) {
   return value;
 }
 
+function getMimeTypeByExt(filePath) {
+  const ext = path.extname(filePath || '').toLowerCase();
+  const mimeMap = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.bmp': 'image/bmp',
+    '.heic': 'image/heic'
+  };
+  return mimeMap[ext] || 'application/octet-stream';
+}
+
 function getTokenFromRequest(req, { allowQuery = false } = {}) {
   const authHeader = req.headers.authorization || '';
   const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
@@ -307,6 +321,8 @@ app.get('/api/photos/file/:id', async (req, res) => {
     res.status(404).json({ message: '照片文件不存在' });
     return;
   }
+  res.setHeader('Content-Type', getMimeTypeByExt(resolvedPath));
+  res.setHeader('Cache-Control', 'private, max-age=60');
   res.sendFile(resolvedPath);
 });
 
