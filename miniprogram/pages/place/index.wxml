@@ -35,6 +35,13 @@
           全部 ({{allPhotos.length}})
         </view>
         <view
+          class="folder-pill {{selectedFolderId === 'unclassified' ? 'active' : ''}}"
+          data-folder-id="unclassified"
+          bindtap="onSelectFolder"
+        >
+          未分类 ({{unclassifiedCount}})
+        </view>
+        <view
           wx:for="{{folders}}"
           wx:key="id"
           class="folder-pill {{selectedFolderId === item.folderKey ? 'active' : ''}}"

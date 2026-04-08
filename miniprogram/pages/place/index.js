@@ -9,6 +9,8 @@ const {
   formatDate
 } = require('../../utils/photo-store');
 
+const UNCLASSIFIED_KEY = 'unclassified';
+
 Page({
   data: {
     placeTitle: '省份相册',
@@ -17,6 +19,7 @@ Page({
     photos: [],
     folders: [],
     selectedFolderId: 'all',
+    unclassifiedCount: 0,
     folderEditorVisible: false,
     pendingFolderName: '',
     selectionMode: false,
@@ -74,7 +77,8 @@ Page({
         timeText: formatDate(item.createdAt),
         displayPath: item.filePath
       }));
-      this.setData({ allPhotos }, () => {
+      const unclassifiedCount = allPhotos.filter((item) => !item.folderId).length;
+      this.setData({ allPhotos, unclassifiedCount }, () => {
         this.applyPhotoFilter();
         this.preparePhotoThumbnails();
       });
@@ -102,7 +106,8 @@ Page({
         return;
       }
 
-      const targetFolderId = selectedFolderId === 'all' ? null : Number(selectedFolderId);
+      const isUnclassified = selectedFolderId === UNCLASSIFIED_KEY;
+      const targetFolderId = selectedFolderId === 'all' || isUnclassified ? null : Number(selectedFolderId);
       const targetFolder = folders.find((item) => String(item.id) === String(selectedFolderId));
       let successCount = 0;
       for (const media of medias) {
@@ -121,7 +126,11 @@ Page({
 
       await this.refreshAllData();
       wx.showToast({
-        title: targetFolder ? `已上传${successCount}张到${targetFolder.name}` : `已上传${successCount}张`,
+        title: targetFolder
+          ? `已上传${successCount}张到${targetFolder.name}`
+          : isUnclassified
+            ? `已上传${successCount}张到未分类`
+            : `已上传${successCount}张`,
         icon: 'success'
       });
     } catch (error) {
@@ -400,6 +409,17 @@ Page({
           ...item,
           checked: selectedSet.has(Number(item.id))
         }))
+      });
+      return;
+    }
+    if (selectedFolderId === UNCLASSIFIED_KEY) {
+      this.setData({
+        photos: allPhotos
+          .filter((item) => !item.folderId)
+          .map((item) => ({
+            ...item,
+            checked: selectedSet.has(Number(item.id))
+          }))
       });
       return;
     }
