@@ -49,9 +49,13 @@
 
     <view class="nick-row">
       <view class="nick-placeholder">昵称</view>
-      <button class="nickname-picker-btn" bindtap="onChooseNickName">
-        {{pendingNickName ? pendingNickName : '选择昵称'}}
-      </button>
+      <input
+        class="nickname-input-inline"
+        type="nickname"
+        value="{{pendingNickName}}"
+        placeholder="点击选择昵称"
+        bindblur="onNicknameInput"
+      />
     </view>
 
     <view class="login-actions">

@@ -188,20 +188,16 @@
   font-size: 22rpx;
 }
 
-.nickname-picker-btn {
+.nickname-input-inline {
   flex: 1;
   height: 66rpx;
   line-height: 66rpx;
-  border-radius: 999rpx;
-  background: #edf7f3;
-  color: #1e5f56;
+  border-radius: 14rpx;
+  border: 1rpx solid #ceded8;
+  background: #ffffff;
+  color: #1f2937;
   font-size: 24rpx;
-  padding: 0 22rpx;
-  text-align: center;
-}
-
-.nickname-picker-btn::after {
-  border: none;
+  padding: 0 16rpx;
 }
 
 .login-actions {
