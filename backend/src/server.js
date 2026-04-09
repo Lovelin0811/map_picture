@@ -242,6 +242,10 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true, time: now() });
 });
 
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true, time: now() });
+});
+
 app.post('/api/auth/wechat-login', async (req, res) => {
   try {
     const { code, nickName = '', avatarUrl = '' } = req.body || {};
@@ -604,7 +608,7 @@ app.delete('/api/photos/:id', authMiddleware, async (req, res) => {
 
 initDb()
   .then(() => {
-    app.listen(port, () => {
+    app.listen(port, '0.0.0.0', () => {
       // eslint-disable-next-line no-console
       console.log(`backend started: http://0.0.0.0:${port}`);
     });

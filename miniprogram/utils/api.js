@@ -30,6 +30,7 @@ function request(path, { method = 'GET', data = null, headers = {} } = {}) {
     wx.request({
       url: makeUrl(path),
       method,
+      timeout: 10000,
       data: hasBody ? data : undefined,
       header: finalHeaders,
       success: (res) => {
