@@ -44,7 +44,8 @@ Page({
     avatarUrl: '',
     loginPanelVisible: false,
     pendingAvatarUrl: '',
-    pendingNickName: ''
+    pendingNickName: '',
+    nickInputFocus: false
   },
 
   onLoad() {
@@ -200,9 +201,16 @@ Page({
     this.setData({ pendingAvatarUrl: avatarUrl });
   },
 
+  onTapNickNamePicker() {
+    this.setData({ nickInputFocus: true });
+  },
+
   onNicknameInput(e) {
     const nickName = (e && e.detail && e.detail.value) || '';
-    this.setData({ pendingNickName: nickName });
+    this.setData({
+      pendingNickName: nickName,
+      nickInputFocus: false
+    });
   },
 
   async onConfirmLogin() {
@@ -233,7 +241,10 @@ Page({
   },
 
   onCancelLogin() {
-    this.setData({ loginPanelVisible: false });
+    this.setData({
+      loginPanelVisible: false,
+      nickInputFocus: false
+    });
   },
 
   onLogout() {
@@ -242,7 +253,8 @@ Page({
     this.setData({
       loginPanelVisible: false,
       pendingAvatarUrl: '',
-      pendingNickName: ''
+      pendingNickName: '',
+      nickInputFocus: false
     });
     this.syncAuthState();
     wx.showToast({ title: '已退出登录', icon: 'none' });

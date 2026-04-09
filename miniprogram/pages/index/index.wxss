@@ -170,6 +170,7 @@
 }
 
 .nick-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14rpx;
@@ -188,16 +189,28 @@
   font-size: 22rpx;
 }
 
-.nickname-input-inline {
+.nickname-picker-btn {
   flex: 1;
   height: 66rpx;
   line-height: 66rpx;
-  border-radius: 14rpx;
-  border: 1rpx solid #ceded8;
-  background: #ffffff;
-  color: #1f2937;
+  border-radius: 999rpx;
+  background: #edf7f3;
+  color: #1e5f56;
   font-size: 24rpx;
-  padding: 0 16rpx;
+  padding: 0 22rpx;
+  text-align: center;
+}
+
+.nickname-picker-btn::after {
+  border: none;
+}
+
+.nickname-hidden-input {
+  position: absolute;
+  width: 2rpx;
+  height: 2rpx;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .login-actions {
