@@ -41,7 +41,10 @@ Page({
     hasLocationPermission: true,
     authStatus: 'idle',
     authText: '点击登录',
-    avatarUrl: ''
+    avatarUrl: '',
+    profilePanelVisible: false,
+    pendingAvatarUrl: '',
+    pendingNickName: ''
   },
 
   onLoad() {
@@ -185,69 +188,26 @@ Page({
     );
   },
 
-  getWechatProfile() {
-    const getByProfile = () =>
-      new Promise((resolve, reject) => {
-        if (typeof wx.getUserProfile !== 'function') {
-          resolve({});
-          return;
-        }
-        wx.getUserProfile({
-          desc: '用于展示微信头像和昵称',
-          success: (res) => resolve((res && res.userInfo) || {}),
-          fail: reject
-        });
-      });
-
-    const getByUserInfo = () =>
-      new Promise((resolve) => {
-        if (typeof wx.getUserInfo !== 'function') {
-          resolve({});
-          return;
-        }
-        wx.getUserInfo({
-          lang: 'zh_CN',
-          success: (res) => resolve((res && res.userInfo) || {}),
-          fail: () => resolve({})
-        });
-      });
-
-    return getByProfile()
-      .then(async (profile) => {
-        if (profile && (profile.avatarUrl || profile.nickName)) {
-          return profile;
-        }
-        return getByUserInfo();
-      })
-      .catch((error) => {
-        const errMsg = (error && error.errMsg) || '';
-        if (errMsg.includes('getUserProfile:fail auth deny') || errMsg.includes('cancel')) {
-          throw error;
-        }
-        return getByUserInfo();
-      });
-  },
-
   async onTapLogin() {
-    if (this.data.authStatus === 'loading' || this.data.authStatus === 'success') {
+    if (this.data.authStatus === 'loading') {
+      return;
+    }
+    if (this.data.authStatus === 'success') {
+      const app = getApp();
+      const session = (app.globalData.auth && app.globalData.auth.session) || {};
+      this.setData({
+        profilePanelVisible: true,
+        pendingAvatarUrl: session.avatarUrl || '',
+        pendingNickName: session.nickName || ''
+      });
       return;
     }
     this.setData({ authStatus: 'loading', authText: '登录中...' });
     const app = getApp();
     try {
-      const profile = await this.getWechatProfile();
-      await app.loginWithWechat({
-        avatarUrl: (profile && profile.avatarUrl) || '',
-        nickName: (profile && profile.nickName) || ''
-      });
+      await app.loginWithWechat({});
       wx.showToast({ title: '登录成功', icon: 'success' });
     } catch (error) {
-      const errMsg = (error && error.errMsg) || '';
-      if (errMsg.includes('getUserProfile:fail auth deny') || errMsg.includes('cancel')) {
-        wx.showToast({ title: '你已取消授权登录', icon: 'none' });
-        this.syncAuthState();
-        return;
-      }
       const authError = (app.globalData.auth && app.globalData.auth.error) || '';
       const message = (error && (error.message || error.errMsg)) || authError || '登录失败';
       wx.showModal({
@@ -259,9 +219,49 @@ Page({
     this.syncAuthState();
   },
 
+  onChooseAvatar(e) {
+    const avatarUrl = (e && e.detail && e.detail.avatarUrl) || '';
+    this.setData({ pendingAvatarUrl: avatarUrl });
+  },
+
+  onNicknameInput(e) {
+    const nickName = (e && e.detail && e.detail.value) || '';
+    this.setData({ pendingNickName: nickName });
+  },
+
+  onCancelProfile() {
+    this.setData({ profilePanelVisible: false });
+  },
+
+  async onConfirmProfile() {
+    const { pendingAvatarUrl, pendingNickName } = this.data;
+    if (!pendingAvatarUrl && !pendingNickName) {
+      wx.showToast({ title: '请至少填写一项资料', icon: 'none' });
+      return;
+    }
+    const app = getApp();
+    try {
+      await app.updateUserProfile({
+        avatarUrl: pendingAvatarUrl || '',
+        nickName: pendingNickName || ''
+      });
+      wx.showToast({ title: '资料已更新', icon: 'success' });
+      this.setData({ profilePanelVisible: false });
+    } catch (error) {
+      const message = (error && (error.message || error.errMsg)) || '资料更新失败';
+      wx.showToast({ title: message, icon: 'none' });
+    }
+    this.syncAuthState();
+  },
+
   onLogout() {
     const app = getApp();
     app.logout();
+    this.setData({
+      profilePanelVisible: false,
+      pendingAvatarUrl: '',
+      pendingNickName: ''
+    });
     this.syncAuthState();
     wx.showToast({ title: '已退出登录', icon: 'none' });
   },
