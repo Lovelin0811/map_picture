@@ -9,6 +9,7 @@ const { run, get, all, initDb } = require('./db');
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
+const host = String(process.env.HOST || '127.0.0.1').trim() || '127.0.0.1';
 const sessionTtlMs = 7 * 24 * 60 * 60 * 1000;
 const defaultPageSize = Number(process.env.PHOTO_PAGE_SIZE || 30);
 const maxPageSize = Number(process.env.PHOTO_MAX_PAGE_SIZE || 80);
@@ -608,9 +609,9 @@ app.delete('/api/photos/:id', authMiddleware, async (req, res) => {
 
 initDb()
   .then(() => {
-    app.listen(port, '0.0.0.0', () => {
+    app.listen(port, host, () => {
       // eslint-disable-next-line no-console
-      console.log(`backend started: http://0.0.0.0:${port}`);
+      console.log(`backend started: http://${host}:${port}`);
     });
   })
   .catch((error) => {
