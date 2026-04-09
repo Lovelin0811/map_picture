@@ -27,9 +27,9 @@
         </view>
       </view>
 
-      <text wx:if="{{authStatus === 'success'}}" class="logout-top" catchtap="onLogout">
-        退出
-      </text>
+      <view wx:if="{{authStatus === 'success'}}" class="logout-top" catchtap="onLogout">
+        <text class="logout-text">退出登录</text>
+      </view>
     </view>
 
     <view class="hint-card">
