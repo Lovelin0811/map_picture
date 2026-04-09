@@ -278,36 +278,6 @@ app.post('/api/auth/logout', authMiddleware, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.patch('/api/auth/profile', authMiddleware, async (req, res) => {
-  const nickName = String((req.body && req.body.nickName) || '').trim();
-  const avatarUrl = String((req.body && req.body.avatarUrl) || '').trim();
-  if (!nickName && !avatarUrl) {
-    res.status(400).json({ message: '缺少可更新的资料' });
-    return;
-  }
-  if (nickName.length > 32) {
-    res.status(400).json({ message: '昵称不能超过32个字符' });
-    return;
-  }
-
-  await run(
-    `
-    UPDATE users
-    SET nickname = CASE WHEN ? <> '' THEN ? ELSE nickname END,
-        avatar_url = CASE WHEN ? <> '' THEN ? ELSE avatar_url END,
-        updated_at = ?
-    WHERE id = ?
-  `,
-    [nickName, nickName, avatarUrl, avatarUrl, now(), req.auth.userId]
-  );
-
-  const user = await get(
-    `SELECT openid as openId, nickname as nickName, avatar_url as avatarUrl FROM users WHERE id = ?`,
-    [req.auth.userId]
-  );
-  res.json({ user });
-});
-
 app.get('/api/photos/stats', authMiddleware, async (req, res) => {
   const rows = await all(
     `

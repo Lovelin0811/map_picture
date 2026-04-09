@@ -34,33 +34,32 @@
 
   </view>
 
-  <view wx:if="{{profilePanelVisible}}" class="profile-mask" bindtap="onCancelProfile"></view>
-  <view wx:if="{{profilePanelVisible}}" class="profile-panel">
-    <text class="profile-title">完善资料</text>
-    <text class="profile-subtitle">登录已完成，可在这里设置头像和昵称。</text>
+  <view wx:if="{{loginPanelVisible}}" class="login-mask" bindtap="onCancelLogin"></view>
+  <view wx:if="{{loginPanelVisible}}" class="login-panel">
+    <text class="login-title">微信登录</text>
+    <text class="login-subtitle">头像和昵称仅用于展示你的地图足迹。</text>
 
-    <view class="profile-avatar-row">
-      <image wx:if="{{pendingAvatarUrl}}" class="profile-avatar-img" src="{{pendingAvatarUrl}}" mode="aspectFill" />
-      <view wx:else class="profile-avatar-placeholder">头像</view>
-      <button class="profile-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+    <view class="avatar-row">
+      <image wx:if="{{pendingAvatarUrl}}" class="picker-avatar-img" src="{{pendingAvatarUrl}}" mode="aspectFill" />
+      <view wx:else class="picker-avatar-placeholder">头像</view>
+      <button class="avatar-picker-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
         {{pendingAvatarUrl ? '重新选择' : '选择头像'}}
       </button>
     </view>
 
-    <view class="profile-nick-row">
-      <view class="profile-nick-placeholder">昵称</view>
+    <view class="nick-row">
+      <view class="nick-placeholder">昵称</view>
       <input
-        class="profile-nick-input"
+        class="nick-input-inline"
         type="nickname"
         placeholder="请输入昵称"
-        value="{{pendingNickName}}"
         bindblur="onNicknameInput"
       />
     </view>
 
-    <view class="profile-actions">
-      <button class="profile-cancel-btn" bindtap="onCancelProfile">取消</button>
-      <button class="profile-confirm-btn" bindtap="onConfirmProfile">保存</button>
+    <view class="login-actions">
+      <button class="cancel-btn" bindtap="onCancelLogin">取消</button>
+      <button class="confirm-btn" bindtap="onConfirmLogin">确认登录</button>
     </view>
   </view>
 </view>

@@ -88,14 +88,14 @@
   line-height: 1;
 }
 
-.profile-mask {
+.login-mask {
   position: fixed;
   inset: 0;
   background: rgba(9, 18, 16, 0.5);
   z-index: 30;
 }
 
-.profile-panel {
+.login-panel {
   position: fixed;
   left: 40rpx;
   right: 40rpx;
@@ -108,14 +108,14 @@
   z-index: 31;
 }
 
-.profile-title {
+.login-title {
   display: block;
   font-size: 32rpx;
   font-weight: 700;
   color: var(--text-primary);
 }
 
-.profile-subtitle {
+.login-subtitle {
   display: block;
   margin-top: 8rpx;
   font-size: 22rpx;
@@ -123,7 +123,7 @@
   line-height: 1.45;
 }
 
-.profile-avatar-row {
+.avatar-row {
   display: flex;
   align-items: center;
   gap: 14rpx;
@@ -131,14 +131,14 @@
   margin-bottom: 16rpx;
 }
 
-.profile-avatar-img {
+.picker-avatar-img {
   width: 72rpx;
   height: 72rpx;
   border-radius: 36rpx;
   background: #e2e8f0;
 }
 
-.profile-avatar-placeholder {
+.picker-avatar-placeholder {
   width: 72rpx;
   height: 72rpx;
   border-radius: 36rpx;
@@ -150,7 +150,7 @@
   font-size: 22rpx;
 }
 
-.profile-avatar-btn {
+.avatar-picker-btn {
   margin: 0;
   height: 66rpx;
   line-height: 66rpx;
@@ -165,18 +165,18 @@
   text-align: center;
 }
 
-.profile-avatar-btn::after {
+.avatar-picker-btn::after {
   border: none;
 }
 
-.profile-nick-row {
+.nick-row {
   display: flex;
   align-items: center;
   gap: 14rpx;
   margin-bottom: 20rpx;
 }
 
-.profile-nick-placeholder {
+.nick-placeholder {
   width: 72rpx;
   height: 72rpx;
   border-radius: 36rpx;
@@ -188,7 +188,7 @@
   font-size: 22rpx;
 }
 
-.profile-nick-input {
+.nick-input-inline {
   flex: 1;
   height: 66rpx;
   line-height: 66rpx;
@@ -199,13 +199,13 @@
   background: #ffffff;
 }
 
-.profile-actions {
+.login-actions {
   display: flex;
   gap: 12rpx;
 }
 
-.profile-cancel-btn,
-.profile-confirm-btn {
+.cancel-btn,
+.confirm-btn {
   flex: 1;
   border-radius: 14rpx;
   height: 72rpx;
@@ -218,17 +218,17 @@
   text-align: center;
 }
 
-.profile-cancel-btn {
+.cancel-btn {
   background: #f3f7f5;
   color: #49655d;
 }
 
-.profile-cancel-btn::after,
-.profile-confirm-btn::after {
+.cancel-btn::after,
+.confirm-btn::after {
   border: none;
 }
 
-.profile-confirm-btn {
+.confirm-btn {
   background: var(--brand-main);
   color: #ffffff;
 }

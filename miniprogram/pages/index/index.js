@@ -42,7 +42,7 @@ Page({
     authStatus: 'idle',
     authText: '点击登录',
     avatarUrl: '',
-    profilePanelVisible: false,
+    loginPanelVisible: false,
     pendingAvatarUrl: '',
     pendingNickName: ''
   },
@@ -189,34 +189,10 @@ Page({
   },
 
   async onTapLogin() {
-    if (this.data.authStatus === 'loading') {
+    if (this.data.authStatus === 'loading' || this.data.authStatus === 'success') {
       return;
     }
-    if (this.data.authStatus === 'success') {
-      const app = getApp();
-      const session = (app.globalData.auth && app.globalData.auth.session) || {};
-      this.setData({
-        profilePanelVisible: true,
-        pendingAvatarUrl: session.avatarUrl || '',
-        pendingNickName: session.nickName || ''
-      });
-      return;
-    }
-    this.setData({ authStatus: 'loading', authText: '登录中...' });
-    const app = getApp();
-    try {
-      await app.loginWithWechat({});
-      wx.showToast({ title: '登录成功', icon: 'success' });
-    } catch (error) {
-      const authError = (app.globalData.auth && app.globalData.auth.error) || '';
-      const message = (error && (error.message || error.errMsg)) || authError || '登录失败';
-      wx.showModal({
-        title: '登录失败诊断',
-        content: `错误: ${message}\n接口: ${API_BASE}`,
-        showCancel: false
-      });
-    }
-    this.syncAuthState();
+    this.setData({ loginPanelVisible: true });
   },
 
   onChooseAvatar(e) {
@@ -229,36 +205,42 @@ Page({
     this.setData({ pendingNickName: nickName });
   },
 
-  onCancelProfile() {
-    this.setData({ profilePanelVisible: false });
-  },
-
-  async onConfirmProfile() {
+  async onConfirmLogin() {
     const { pendingAvatarUrl, pendingNickName } = this.data;
-    if (!pendingAvatarUrl && !pendingNickName) {
-      wx.showToast({ title: '请至少填写一项资料', icon: 'none' });
+    if (!pendingAvatarUrl) {
+      wx.showToast({ title: '请先选择头像', icon: 'none' });
+      return;
+    }
+    if (!pendingNickName) {
+      wx.showToast({ title: '请先填写昵称', icon: 'none' });
       return;
     }
     const app = getApp();
     try {
-      await app.updateUserProfile({
-        avatarUrl: pendingAvatarUrl || '',
-        nickName: pendingNickName || ''
-      });
-      wx.showToast({ title: '资料已更新', icon: 'success' });
-      this.setData({ profilePanelVisible: false });
+      await app.loginWithWechat({ avatarUrl: pendingAvatarUrl, nickName: pendingNickName });
+      wx.showToast({ title: '登录成功', icon: 'success' });
+      this.setData({ loginPanelVisible: false });
     } catch (error) {
-      const message = (error && (error.message || error.errMsg)) || '资料更新失败';
-      wx.showToast({ title: message, icon: 'none' });
+      const authError = (app.globalData.auth && app.globalData.auth.error) || '';
+      const message = (error && (error.message || error.errMsg)) || authError || '登录失败';
+      wx.showModal({
+        title: '登录失败诊断',
+        content: `错误: ${message}\n接口: ${API_BASE}`,
+        showCancel: false
+      });
     }
     this.syncAuthState();
+  },
+
+  onCancelLogin() {
+    this.setData({ loginPanelVisible: false });
   },
 
   onLogout() {
     const app = getApp();
     app.logout();
     this.setData({
-      profilePanelVisible: false,
+      loginPanelVisible: false,
       pendingAvatarUrl: '',
       pendingNickName: ''
     });

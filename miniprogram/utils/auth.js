@@ -45,43 +45,6 @@ async function manualLogin(profile = {}) {
   return session;
 }
 
-function buildSessionByPayload(baseSession, payload = {}) {
-  const user = payload.user || {};
-  return {
-    token: (baseSession && baseSession.token) || '',
-    expiresAt: (baseSession && baseSession.expiresAt) || 0,
-    openId: user.openId || (baseSession && baseSession.openId) || '',
-    nickName: user.nickName || (baseSession && baseSession.nickName) || '',
-    avatarUrl: normalizeAvatarUrl(user.avatarUrl || (baseSession && baseSession.avatarUrl) || '')
-  };
-}
-
-function getCachedSession() {
-  const cached = wx.getStorageSync(AUTH_STORAGE_KEY);
-  if (cached && cached.token) {
-    return cached;
-  }
-  return null;
-}
-
-async function updateProfile(profile = {}) {
-  const baseSession = getCachedSession();
-  if (!baseSession || !baseSession.token) {
-    throw new Error('未登录');
-  }
-  setAuthToken(baseSession.token);
-  const payload = await request('/api/auth/profile', {
-    method: 'PATCH',
-    data: {
-      nickName: profile.nickName || '',
-      avatarUrl: normalizeAvatarUrl(profile.avatarUrl || '')
-    }
-  });
-  const nextSession = buildSessionByPayload(baseSession, payload);
-  wx.setStorageSync(AUTH_STORAGE_KEY, nextSession);
-  return nextSession;
-}
-
 function restoreSession() {
   const cached = wx.getStorageSync(AUTH_STORAGE_KEY);
   if (cached && cached.token) {
@@ -104,7 +67,6 @@ function clearSession() {
 
 module.exports = {
   manualLogin,
-  updateProfile,
   clearSession,
   restoreSession
 };
