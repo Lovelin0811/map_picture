@@ -41,10 +41,7 @@ Page({
     hasLocationPermission: true,
     authStatus: 'idle',
     authText: '点击登录',
-    avatarUrl: '',
-    loginPanelVisible: false,
-    pendingAvatarUrl: '',
-    pendingNickName: ''
+    avatarUrl: ''
   },
 
   onLoad() {
@@ -188,39 +185,39 @@ Page({
     );
   },
 
+  getWechatProfile() {
+    if (typeof wx.getUserProfile !== 'function') {
+      return Promise.resolve({});
+    }
+    return new Promise((resolve, reject) => {
+      wx.getUserProfile({
+        desc: '用于展示微信头像和昵称',
+        success: (res) => resolve((res && res.userInfo) || {}),
+        fail: reject
+      });
+    });
+  },
+
   async onTapLogin() {
     if (this.data.authStatus === 'loading' || this.data.authStatus === 'success') {
       return;
     }
-    this.setData({ loginPanelVisible: true });
-  },
-
-  onChooseAvatar(e) {
-    const avatarUrl = (e && e.detail && e.detail.avatarUrl) || '';
-    this.setData({ pendingAvatarUrl: avatarUrl });
-  },
-
-  onNicknameInput(e) {
-    const nickName = (e && e.detail && e.detail.value) || '';
-    this.setData({ pendingNickName: nickName });
-  },
-
-  async onConfirmLogin() {
-    const { pendingAvatarUrl, pendingNickName } = this.data;
-    if (!pendingAvatarUrl) {
-      wx.showToast({ title: '请先选择头像', icon: 'none' });
-      return;
-    }
-    if (!pendingNickName) {
-      wx.showToast({ title: '请先填写昵称', icon: 'none' });
-      return;
-    }
+    this.setData({ authStatus: 'loading', authText: '登录中...' });
     const app = getApp();
     try {
-      await app.loginWithWechat({ avatarUrl: pendingAvatarUrl, nickName: pendingNickName });
+      const profile = await this.getWechatProfile();
+      await app.loginWithWechat({
+        avatarUrl: (profile && profile.avatarUrl) || '',
+        nickName: (profile && profile.nickName) || ''
+      });
       wx.showToast({ title: '登录成功', icon: 'success' });
-      this.setData({ loginPanelVisible: false });
     } catch (error) {
+      const errMsg = (error && error.errMsg) || '';
+      if (errMsg.includes('getUserProfile:fail auth deny') || errMsg.includes('cancel')) {
+        wx.showToast({ title: '你已取消授权登录', icon: 'none' });
+        this.syncAuthState();
+        return;
+      }
       const authError = (app.globalData.auth && app.globalData.auth.error) || '';
       const message = (error && (error.message || error.errMsg)) || authError || '登录失败';
       wx.showModal({
@@ -232,18 +229,9 @@ Page({
     this.syncAuthState();
   },
 
-  onCancelLogin() {
-    this.setData({ loginPanelVisible: false });
-  },
-
   onLogout() {
     const app = getApp();
     app.logout();
-    this.setData({
-      loginPanelVisible: false,
-      pendingAvatarUrl: '',
-      pendingNickName: ''
-    });
     this.syncAuthState();
     wx.showToast({ title: '已退出登录', icon: 'none' });
   },
