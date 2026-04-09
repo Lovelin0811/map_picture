@@ -32,10 +32,6 @@
       </view>
     </view>
 
-    <view class="hint-card">
-      <text class="hint-title">地图相册</text>
-      <text class="hint-text">点击标记查看照片，点空白地图可创建新地点。</text>
-    </view>
   </view>
 
   <view wx:if="{{loginPanelVisible}}" class="login-mask" bindtap="onCancelLogin"></view>

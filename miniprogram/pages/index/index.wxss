@@ -88,31 +88,6 @@
   line-height: 1;
 }
 
-.hint-card {
-  pointer-events: auto;
-  margin-top: 18rpx;
-  max-width: 510rpx;
-  border-radius: 24rpx;
-  padding: 18rpx 20rpx;
-  background: rgba(12, 30, 26, 0.76);
-}
-
-.hint-title {
-  display: block;
-  color: #f3faf7;
-  font-size: 28rpx;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.hint-text {
-  display: block;
-  color: #d6e5df;
-  font-size: 22rpx;
-  margin-top: 8rpx;
-  line-height: 1.45;
-}
-
 .login-mask {
   position: fixed;
   inset: 0;
