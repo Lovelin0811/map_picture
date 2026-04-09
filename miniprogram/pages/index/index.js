@@ -200,9 +200,30 @@ Page({
     this.setData({ pendingAvatarUrl: avatarUrl });
   },
 
-  onNicknameInput(e) {
-    const nickName = (e && e.detail && e.detail.value) || '';
-    this.setData({ pendingNickName: nickName });
+  onChooseNickName() {
+    if (typeof wx.getUserProfile !== 'function') {
+      wx.showToast({ title: '当前基础库不支持自动获取昵称', icon: 'none' });
+      return;
+    }
+    wx.getUserProfile({
+      desc: '用于获取微信昵称',
+      success: (res) => {
+        const nickName = (res && res.userInfo && res.userInfo.nickName) || '';
+        if (!nickName) {
+          wx.showToast({ title: '未获取到昵称', icon: 'none' });
+          return;
+        }
+        this.setData({ pendingNickName: nickName });
+      },
+      fail: (error) => {
+        const errMsg = (error && error.errMsg) || '';
+        if (errMsg.includes('cancel')) {
+          wx.showToast({ title: '你已取消选择昵称', icon: 'none' });
+          return;
+        }
+        wx.showToast({ title: '获取昵称失败', icon: 'none' });
+      }
+    });
   },
 
   async onConfirmLogin() {
