@@ -197,8 +197,14 @@ async function upsertUser(openid, nickname, avatarUrl) {
     INSERT INTO users(openid, nickname, avatar_url, created_at, updated_at)
     VALUES(?, ?, ?, ?, ?)
     ON CONFLICT(openid) DO UPDATE SET
-      nickname = excluded.nickname,
-      avatar_url = excluded.avatar_url,
+      nickname = CASE
+        WHEN excluded.nickname <> '' THEN excluded.nickname
+        ELSE users.nickname
+      END,
+      avatar_url = CASE
+        WHEN excluded.avatar_url <> '' THEN excluded.avatar_url
+        ELSE users.avatar_url
+      END,
       updated_at = excluded.updated_at
   `,
     [openid, nickname || '', avatarUrl || '', ts, ts]

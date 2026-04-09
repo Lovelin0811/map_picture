@@ -186,16 +186,46 @@ Page({
   },
 
   getWechatProfile() {
-    if (typeof wx.getUserProfile !== 'function') {
-      return Promise.resolve({});
-    }
-    return new Promise((resolve, reject) => {
-      wx.getUserProfile({
-        desc: '用于展示微信头像和昵称',
-        success: (res) => resolve((res && res.userInfo) || {}),
-        fail: reject
+    const getByProfile = () =>
+      new Promise((resolve, reject) => {
+        if (typeof wx.getUserProfile !== 'function') {
+          resolve({});
+          return;
+        }
+        wx.getUserProfile({
+          desc: '用于展示微信头像和昵称',
+          success: (res) => resolve((res && res.userInfo) || {}),
+          fail: reject
+        });
       });
-    });
+
+    const getByUserInfo = () =>
+      new Promise((resolve) => {
+        if (typeof wx.getUserInfo !== 'function') {
+          resolve({});
+          return;
+        }
+        wx.getUserInfo({
+          lang: 'zh_CN',
+          success: (res) => resolve((res && res.userInfo) || {}),
+          fail: () => resolve({})
+        });
+      });
+
+    return getByProfile()
+      .then(async (profile) => {
+        if (profile && (profile.avatarUrl || profile.nickName)) {
+          return profile;
+        }
+        return getByUserInfo();
+      })
+      .catch((error) => {
+        const errMsg = (error && error.errMsg) || '';
+        if (errMsg.includes('getUserProfile:fail auth deny') || errMsg.includes('cancel')) {
+          throw error;
+        }
+        return getByUserInfo();
+      });
   },
 
   async onTapLogin() {
