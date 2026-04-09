@@ -17,19 +17,33 @@
     bindtap="onMapTap"
   />
 
-  <view class="avatar-entry" bindtap="onTapLogin">
-    <image wx:if="{{avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" mode="aspectFill" />
-    <view wx:else class="avatar-placeholder">{{authStatus === 'loading' ? '...' : '登'}}</view>
-    <text class="avatar-text">{{authText}}</text>
-  </view>
+  <view class="map-overlay">
+    <view class="topbar">
+      <view class="avatar-entry" bindtap="onTapLogin">
+        <image wx:if="{{avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" mode="aspectFill" />
+        <view wx:else class="avatar-placeholder">{{authStatus === 'loading' ? '...' : '登'}}</view>
+        <view class="avatar-copy">
+          <text class="avatar-text">{{authText}}</text>
+          <text class="avatar-sub">点击可切换账号</text>
+        </view>
+      </view>
 
-  <text wx:if="{{authStatus === 'success'}}" class="logout-top" catchtap="onLogout">
-    退出
-  </text>
+      <text wx:if="{{authStatus === 'success'}}" class="logout-top" catchtap="onLogout">
+        退出
+      </text>
+    </view>
+
+    <view class="hint-card">
+      <text class="hint-title">地图相册</text>
+      <text class="hint-text">点击标记查看照片，点空白地图可创建新地点。</text>
+    </view>
+  </view>
 
   <view wx:if="{{loginPanelVisible}}" class="login-mask" bindtap="onCancelLogin"></view>
   <view wx:if="{{loginPanelVisible}}" class="login-panel">
     <text class="login-title">微信登录</text>
+    <text class="login-subtitle">头像和昵称仅用于展示你的地图足迹。</text>
+
     <view class="avatar-row">
       <image wx:if="{{pendingAvatarUrl}}" class="picker-avatar-img" src="{{pendingAvatarUrl}}" mode="aspectFill" />
       <view wx:else class="picker-avatar-placeholder">头像</view>

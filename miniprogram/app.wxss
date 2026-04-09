@@ -1,7 +1,21 @@
 page {
-  background: #f6f8fb;
-  color: #1f2937;
-  font-size: 30rpx;
+  --bg-soft: #eef4f2;
+  --surface: #ffffff;
+  --surface-muted: #f5faf8;
+  --text-primary: #10211d;
+  --text-secondary: #4a5f59;
+  --text-tertiary: #6f847d;
+  --border-soft: #d6e4de;
+  --brand-strong: #0d6a5f;
+  --brand-main: #138272;
+  --brand-light: #d7efe9;
+  --danger-main: #dc3f4f;
+
+  background: radial-gradient(circle at 8% -10%, #f8fffc 10%, transparent 45%), var(--bg-soft);
+  color: var(--text-primary);
+  font-size: 28rpx;
+  font-family: 'Avenir Next', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  line-height: 1.45;
 }
 
 .container {
