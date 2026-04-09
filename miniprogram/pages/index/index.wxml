@@ -24,7 +24,6 @@
         <view wx:else class="avatar-placeholder">{{authStatus === 'loading' ? '...' : '登'}}</view>
         <view class="avatar-copy">
           <text class="avatar-text">{{authText}}</text>
-          <text class="avatar-sub">点击可切换账号</text>
         </view>
       </view>
 

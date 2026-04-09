@@ -59,20 +59,12 @@
 
 .avatar-copy {
   display: flex;
-  flex-direction: column;
-  gap: 2rpx;
 }
 
 .avatar-text {
   font-size: 24rpx;
   font-weight: 600;
   color: var(--text-primary);
-  line-height: 1.2;
-}
-
-.avatar-sub {
-  font-size: 20rpx;
-  color: var(--text-tertiary);
   line-height: 1.2;
 }
 
