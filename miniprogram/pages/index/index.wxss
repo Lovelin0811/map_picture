@@ -151,6 +151,8 @@
 }
 
 .avatar-picker-btn {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   height: 66rpx;
   line-height: 66rpx;
@@ -191,6 +193,8 @@
 
 .nickname-picker-btn {
   flex: 1;
+  min-width: 0;
+  margin: 0;
   height: 66rpx;
   line-height: 66rpx;
   border-radius: 999rpx;
@@ -198,6 +202,9 @@
   color: #1e5f56;
   font-size: 24rpx;
   padding: 0 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
 }
 
