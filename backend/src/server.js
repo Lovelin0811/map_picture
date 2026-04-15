@@ -6,6 +6,7 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const { run, get, all, initDb } = require('./db');
+const logger = require('./logger');
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -72,6 +73,26 @@ app.use(
   })
 );
 app.use(express.json({ limit: '20mb' }));
+app.use((req, res, next) => {
+  const requestId = crypto.randomBytes(6).toString('hex');
+  const startAt = Date.now();
+  req.requestId = requestId;
+  res.setHeader('X-Request-Id', requestId);
+  res.on('finish', () => {
+    const durationMs = Date.now() - startAt;
+    const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+    logger[level]('request completed', {
+      requestId,
+      method: req.method,
+      path: req.originalUrl,
+      statusCode: res.statusCode,
+      durationMs,
+      userId: req.auth && req.auth.userId ? req.auth.userId : null,
+      ip: req.ip
+    });
+  });
+  next();
+});
 
 function now() {
   return Date.now();
@@ -131,8 +152,10 @@ async function unlinkUploadFileSafe(filePath) {
     await fs.promises.unlink(resolvedPath);
   } catch (error) {
     if (error && error.code !== 'ENOENT') {
-      // eslint-disable-next-line no-console
-      console.warn('unlink upload file failed:', error.message);
+      logger.warn('unlink upload file failed', {
+        error: error.message,
+        filePath: resolvedPath
+      });
     }
   }
 }
@@ -268,8 +291,10 @@ app.post('/api/auth/wechat-login', async (req, res) => {
       }
     });
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('wechat-login failed:', error.message);
+    logger.error('wechat-login failed', {
+      requestId: req.requestId,
+      error: error.message
+    });
     res.status(500).json({ message: '登录失败', detail: error.message });
   }
 });
@@ -607,15 +632,31 @@ app.delete('/api/photos/:id', authMiddleware, async (req, res) => {
   }
 });
 
+app.use((error, req, res, _next) => {
+  logger.error('unhandled server error', {
+    requestId: req && req.requestId ? req.requestId : null,
+    method: req && req.method ? req.method : null,
+    path: req && req.originalUrl ? req.originalUrl : null,
+    error: error && error.message ? error.message : String(error)
+  });
+  if (res.headersSent) {
+    return;
+  }
+  res.status(500).json({ message: '服务器内部错误' });
+});
+
 initDb()
   .then(() => {
     app.listen(port, host, () => {
-      // eslint-disable-next-line no-console
-      console.log(`backend started: http://${host}:${port}`);
+      logger.info('backend started', {
+        host,
+        port,
+        env: process.env.NODE_ENV || 'development',
+        logLevel: process.env.LOG_LEVEL || 'info'
+      });
     });
   })
   .catch((error) => {
-    // eslint-disable-next-line no-console
-    console.error('failed to init db:', error);
+    logger.error('failed to init db', { error: error && error.message ? error.message : String(error) });
     process.exit(1);
   });
