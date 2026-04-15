@@ -1,24 +1,72 @@
 page {
-  --bg-soft: #eef4f2;
-  --surface: #ffffff;
-  --surface-muted: #f5faf8;
-  --text-primary: #10211d;
-  --text-secondary: #4a5f59;
-  --text-tertiary: #6f847d;
-  --border-soft: #d6e4de;
-  --brand-strong: #0d6a5f;
-  --brand-main: #138272;
-  --brand-light: #d7efe9;
-  --danger-main: #dc3f4f;
+  /* 主色调 - 深蓝绿 */
+  --brand-900: #0d3b38;
+  --brand-800: #0f4a46;
+  --brand-700: #125c57;
+  --brand-600: #167069;
+  --brand-500: #1a857d;
+  --brand-400: #2a9d94;
+  --brand-300: #4dbfb5;
+  --brand-200: #7dd9d1;
+  --brand-100: #b3f0eb;
+  --brand-50: #e6faf8;
 
-  background: radial-gradient(circle at 8% -10%, #f8fffc 10%, transparent 45%), var(--bg-soft);
+  /* 中性色 */
+  --gray-900: #0f172a;
+  --gray-800: #1e293b;
+  --gray-700: #334155;
+  --gray-600: #475569;
+  --gray-500: #64748b;
+  --gray-400: #94a3b8;
+  --gray-300: #cbd5e1;
+  --gray-200: #e2e8f0;
+  --gray-100: #f1f5f9;
+  --gray-50: #f8fafc;
+
+  /* 语义色 */
+  --success-500: #10b981;
+  --success-100: #d1fae5;
+  --warning-500: #f59e0b;
+  --warning-100: #fef3c7;
+  --error-500: #ef4444;
+  --error-100: #fee2e2;
+  --info-500: #3b82f6;
+  --info-100: #dbeafe;
+
+  /* 功能色 */
+  --text-primary: var(--gray-900);
+  --text-secondary: var(--gray-600);
+  --text-tertiary: var(--gray-400);
+  --text-inverse: #ffffff;
+
+  --bg-primary: #f8fafc;
+  --bg-secondary: var(--gray-100);
+  --bg-elevated: #ffffff;
+
+  --border-light: var(--gray-200);
+  --border-medium: var(--gray-300);
+
+  --brand-main: var(--brand-600);
+  --brand-light: var(--brand-100);
+
+  /* 阴影系统 */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-brand: 0 4px 14px 0 rgb(22 112 105 / 0.35);
+
+  /* 基础 */
+  background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 28rpx;
-  font-family: 'Avenir Next', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
-  line-height: 1.45;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 .container {
-  padding: 28rpx;
+  padding: 32rpx;
   box-sizing: border-box;
 }
