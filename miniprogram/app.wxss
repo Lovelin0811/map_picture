@@ -29,6 +29,7 @@ page {
   --warning-500: #f59e0b;
   --warning-100: #fef3c7;
   --error-500: #ef4444;
+  --error-600: #dc2626;
   --error-100: #fee2e2;
   --info-500: #3b82f6;
   --info-100: #dbeafe;
@@ -42,6 +43,8 @@ page {
   --bg-primary: #f8fafc;
   --bg-secondary: var(--gray-100);
   --bg-elevated: #ffffff;
+  --bg-overlay: rgba(15, 23, 42, 0.6);
+  --bg-glass: rgba(255, 255, 255, 0.95);
 
   --border-light: var(--gray-200);
   --border-medium: var(--gray-300);
@@ -56,6 +59,8 @@ page {
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   --shadow-brand: 0 4px 14px 0 rgb(22 112 105 / 0.35);
+
+  --white: #ffffff;
 
   /* 基础 */
   background: var(--bg-primary);

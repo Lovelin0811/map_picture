@@ -1,5 +1,17 @@
+const API_BASE_BY_ENV = {
+  // 本机开发者工具
+  dev: 'http://127.0.0.1:3000',
+  // 真机调试（请改成当前电脑局域网 IP）
+  device: 'http://192.168.10.4:3000',
+  // 正式环境（替换为你的正式域名）
+  prod: 'https://example.com'
+};
+
+// 只改这一行就能切环境：dev | device | prod
+const API_ENV = 'device';
+
 module.exports = {
-  // 这里改成你绑定好的正式自定义域名
-  // 真机调试请使用当前电脑局域网 IP
-  API_BASE: 'http://192.168.10.4:3000'
+  API_ENV,
+  API_BASE_BY_ENV,
+  API_BASE: API_BASE_BY_ENV[API_ENV] || API_BASE_BY_ENV.device
 };

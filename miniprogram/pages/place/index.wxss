@@ -178,7 +178,7 @@
 
 .folder-pill.active {
   background: var(--brand-main);
-  color: #ffffff;
+  color: var(--white);
   box-shadow: var(--shadow-brand);
 }
 
@@ -249,7 +249,7 @@
   width: 40rpx;
   height: 40rpx;
   border-radius: 50%;
-  border: 3rpx solid rgba(255, 255, 255, 0.9);
+  border: 3rpx solid var(--white);
   background: rgba(15, 23, 42, 0.25);
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.15);
   transition: all 0.2s ease;
@@ -265,7 +265,7 @@
   left: 32rpx;
   right: 32rpx;
   bottom: 32rpx;
-  background: rgba(255, 255, 255, 0.98);
+  background: var(--bg-glass);
   border: 1rpx solid var(--border-light);
   border-radius: 20rpx;
   box-shadow: var(--shadow-xl);
@@ -315,7 +315,7 @@
 }
 
 .batch-chip.primary .batch-chip-text {
-  color: #ffffff;
+  color: var(--white);
 }
 
 .batch-chip.primary:active {
@@ -324,15 +324,15 @@
 
 .batch-chip.danger {
   background: var(--error-500);
-  box-shadow: 0 4rpx 14rpx 0 rgba(239, 68, 68, 0.35);
+  box-shadow: 0 4rpx 14rpx 0 rgb(239 68 68 / 0.35);
 }
 
 .batch-chip.danger .batch-chip-text {
-  color: #ffffff;
+  color: var(--white);
 }
 
 .batch-chip.danger:active {
-  background: #dc2626;
+  background: var(--error-600);
 }
 
 .fab {
@@ -357,7 +357,7 @@
 }
 
 .fab-text {
-  color: #ffffff;
+  color: var(--white);
   font-size: 48rpx;
   line-height: 48rpx;
   font-weight: 300;
