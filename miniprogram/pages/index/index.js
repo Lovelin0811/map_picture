@@ -54,6 +54,8 @@ Page({
     nickInputFocus: false
   },
 
+  pairPollTimer: null,
+
   onLoad() {
     this.syncAuthState();
     this.ensureLocationAndLoadMap();
@@ -63,6 +65,15 @@ Page({
     await this.loadMarkers();
     this.syncAuthState();
     await this.refreshPairStatus();
+    this.startPairPolling();
+  },
+
+  onHide() {
+    this.stopPairPolling();
+  },
+
+  onUnload() {
+    this.stopPairPolling();
   },
 
   async ensureLocationAndLoadMap() {
@@ -224,6 +235,20 @@ Page({
       });
     } catch (_error) {
       this.clearPairState();
+    }
+  },
+
+  startPairPolling() {
+    this.stopPairPolling();
+    this.pairPollTimer = setInterval(() => {
+      this.refreshPairStatus();
+    }, 4000);
+  },
+
+  stopPairPolling() {
+    if (this.pairPollTimer) {
+      clearInterval(this.pairPollTimer);
+      this.pairPollTimer = null;
     }
   },
 
