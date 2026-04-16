@@ -35,6 +35,10 @@ const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
+const avatarUploadsDir = path.join(uploadsDir, 'avatars');
+if (!fs.existsSync(avatarUploadsDir)) {
+  fs.mkdirSync(avatarUploadsDir, { recursive: true });
+}
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadsDir),
@@ -46,6 +50,27 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
+  limits: { fileSize: maxUploadBytes },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const mime = String(file.mimetype || '').toLowerCase();
+    if (!allowedImageExt.has(ext) || !allowedImageMime.has(mime)) {
+      cb(new Error('仅支持 jpg/png/gif/webp/bmp/heic 图片'));
+      return;
+    }
+    cb(null, true);
+  }
+});
+const avatarStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, avatarUploadsDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    const safeExt = ext && ext.length <= 6 ? ext : '.jpg';
+    cb(null, `${Date.now()}_${crypto.randomBytes(6).toString('hex')}${safeExt}`);
+  }
+});
+const uploadAvatar = multer({
+  storage: avatarStorage,
   limits: { fileSize: maxUploadBytes },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname || '').toLowerCase();
@@ -74,6 +99,7 @@ app.use(
   })
 );
 app.use(express.json({ limit: '20mb' }));
+app.use('/uploads/avatars', express.static(avatarUploadsDir, { maxAge: '7d' }));
 app.use((req, res, next) => {
   const requestId = crypto.randomBytes(6).toString('hex');
   const startAt = Date.now();
@@ -101,6 +127,9 @@ function now() {
 
 function normalizeAvatarUrl(url) {
   if (!url || typeof url !== 'string') {
+    return '';
+  }
+  if (url.startsWith('wxfile://')) {
     return '';
   }
   return url.endsWith('/0') ? `${url.slice(0, -2)}/132` : url;
@@ -368,6 +397,30 @@ app.post('/api/auth/wechat-login', async (req, res) => {
 app.post('/api/auth/logout', authMiddleware, async (req, res) => {
   await run(`DELETE FROM sessions WHERE token = ?`, [req.auth.token]);
   res.json({ ok: true });
+});
+
+function uploadAvatarMiddleware(req, res, next) {
+  uploadAvatar.single('file')(req, res, (error) => {
+    if (!error) {
+      next();
+      return;
+    }
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+      res.status(413).json({ message: `头像不能超过 ${maxUploadMb}MB` });
+      return;
+    }
+    res.status(400).json({ message: error.message || '上传头像失败' });
+  });
+}
+
+app.post('/api/auth/avatar', authMiddleware, uploadAvatarMiddleware, async (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ message: '缺少头像文件' });
+    return;
+  }
+  const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+  await run(`UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?`, [avatarUrl, now(), req.auth.userId]);
+  res.json({ avatarUrl: normalizeAvatarUrl(avatarUrl) });
 });
 
 app.get('/api/pair/status', authMiddleware, async (req, res) => {

@@ -34,6 +34,22 @@ function getProvinceVisualCenter(province) {
   };
 }
 
+function resolveDisplayAvatar(url) {
+  if (!url || typeof url !== 'string') {
+    return '';
+  }
+  if (url.startsWith('wxfile://')) {
+    return '';
+  }
+  if (/^https?:\/\//.test(url)) {
+    return url;
+  }
+  if (url.startsWith('/')) {
+    return `${API_BASE}${url}`;
+  }
+  return url;
+}
+
 Page({
   data: {
     latitude: 35.8617,
@@ -188,7 +204,7 @@ Page({
       {
         authStatus: auth.status || 'idle',
         authText,
-        avatarUrl: session.avatarUrl || ''
+        avatarUrl: resolveDisplayAvatar(session.avatarUrl || '')
       },
       () => {
         this.loadMarkers();
@@ -221,7 +237,7 @@ Page({
       const partner = pair && pair.partner;
       this.setData({
         pairPaired: !!(pair && pair.paired && partner),
-        pairAvatarUrl: (partner && partner.avatarUrl) || '',
+        pairAvatarUrl: resolveDisplayAvatar((partner && partner.avatarUrl) || ''),
         pairHintText: partner ? partner.nickName || '已配对' : '未配对'
       });
     } catch (_error) {
