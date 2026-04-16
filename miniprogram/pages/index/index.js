@@ -54,8 +54,6 @@ Page({
     nickInputFocus: false
   },
 
-  pairPollTimer: null,
-
   onLoad() {
     this.syncAuthState();
     this.ensureLocationAndLoadMap();
@@ -65,15 +63,6 @@ Page({
     await this.loadMarkers();
     this.syncAuthState();
     await this.refreshPairStatus();
-    this.startPairPolling();
-  },
-
-  onHide() {
-    this.stopPairPolling();
-  },
-
-  onUnload() {
-    this.stopPairPolling();
   },
 
   async ensureLocationAndLoadMap() {
@@ -238,20 +227,6 @@ Page({
     }
   },
 
-  startPairPolling() {
-    this.stopPairPolling();
-    this.pairPollTimer = setInterval(() => {
-      this.refreshPairStatus();
-    }, 4000);
-  },
-
-  stopPairPolling() {
-    if (this.pairPollTimer) {
-      clearInterval(this.pairPollTimer);
-      this.pairPollTimer = null;
-    }
-  },
-
   resetLoginDraft() {
     this.setData({
       pendingAvatarUrl: '',
@@ -355,13 +330,18 @@ Page({
       return;
     }
     wx.showActionSheet({
-      itemList: ['生成邀请码', '输入邀请码加入'],
+      itemList: ['刷新配对状态', '生成邀请码', '输入邀请码加入'],
       success: async (res) => {
         if (res.tapIndex === 0) {
-          await this.onCreateInvite();
+          await this.refreshPairStatus();
+          wx.showToast({ title: this.data.pairPaired ? '已检测到配对' : '当前仍未配对', icon: 'none' });
           return;
         }
         if (res.tapIndex === 1) {
+          await this.onCreateInvite();
+          return;
+        }
+        if (res.tapIndex === 2) {
           this.setData({
             acceptPanelVisible: true,
             pendingInviteCode: ''
