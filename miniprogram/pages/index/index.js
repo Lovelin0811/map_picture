@@ -319,9 +319,14 @@ Page({
     }
     if (this.data.pairPaired) {
       wx.showActionSheet({
-        itemList: ['解除配对'],
+        itemList: ['刷新配对状态', '解除配对'],
         success: async (res) => {
-          if (res.tapIndex !== 0) {
+          if (res.tapIndex === 0) {
+            await this.refreshPairStatus();
+            wx.showToast({ title: this.data.pairPaired ? '当前已配对' : '当前未配对', icon: 'none' });
+            return;
+          }
+          if (res.tapIndex !== 1) {
             return;
           }
           await this.onUnbindPair();
