@@ -210,7 +210,9 @@ Page({
   },
 
   async refreshPairStatus() {
-    if (!this.isLoggedIn()) {
+    const app = getApp();
+    const auth = (app && app.globalData && app.globalData.auth) || {};
+    if (auth.status !== 'success') {
       this.clearPairState();
       return;
     }
