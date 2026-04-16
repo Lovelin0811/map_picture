@@ -1,6 +1,7 @@
 const { fetchProvinceStats } = require('../../utils/photo-store');
 const { PROVINCES, findProvinceByTapPoint } = require('../../utils/provinces');
 const { API_BASE, API_ENV } = require('../../config');
+const { getPairStatus, createPairInvite, acceptPairInvite, unbindPair } = require('../../utils/pair-store');
 
 function getProvinceLabelOffset(name, halfWidth) {
   const defaults = { anchorX: -halfWidth, anchorY: -10 };
@@ -42,6 +43,11 @@ Page({
     authStatus: 'idle',
     authText: '点击登录',
     avatarUrl: '',
+    pairPaired: false,
+    pairAvatarUrl: '',
+    pairHintText: '未配对',
+    acceptPanelVisible: false,
+    pendingInviteCode: '',
     loginPanelVisible: false,
     pendingAvatarUrl: '',
     pendingNickName: '',
@@ -56,6 +62,7 @@ Page({
   async onShow() {
     await this.loadMarkers();
     this.syncAuthState();
+    await this.refreshPairStatus();
   },
 
   async ensureLocationAndLoadMap() {
@@ -187,6 +194,37 @@ Page({
         this.loadMarkers();
       }
     );
+    if (auth.status !== 'success') {
+      this.clearPairState();
+    }
+  },
+
+  clearPairState() {
+    this.setData({
+      pairPaired: false,
+      pairAvatarUrl: '',
+      pairHintText: '未配对',
+      acceptPanelVisible: false,
+      pendingInviteCode: ''
+    });
+  },
+
+  async refreshPairStatus() {
+    if (!this.isLoggedIn()) {
+      this.clearPairState();
+      return;
+    }
+    try {
+      const pair = await getPairStatus();
+      const partner = pair && pair.partner;
+      this.setData({
+        pairPaired: !!(pair && pair.paired && partner),
+        pairAvatarUrl: (partner && partner.avatarUrl) || '',
+        pairHintText: partner ? partner.nickName || '已配对' : '未配对'
+      });
+    } catch (_error) {
+      this.clearPairState();
+    }
   },
 
   resetLoginDraft() {
@@ -241,6 +279,7 @@ Page({
       wx.showToast({ title: '登录成功', icon: 'success' });
       this.setData({ loginPanelVisible: false });
       this.resetLoginDraft();
+      await this.refreshPairStatus();
     } catch (error) {
       const authError = (app.globalData.auth && app.globalData.auth.error) || '';
       const message = (error && (error.message || error.errMsg)) || authError || '登录失败';
@@ -268,8 +307,108 @@ Page({
       pendingNickName: '',
       nickInputFocus: false
     });
+    this.clearPairState();
     this.syncAuthState();
     wx.showToast({ title: '已退出登录', icon: 'none' });
+  },
+
+  async onTapPairEntry() {
+    if (!this.isLoggedIn()) {
+      this.showLoginRequiredToast();
+      return;
+    }
+    if (this.data.pairPaired) {
+      wx.showActionSheet({
+        itemList: ['解除配对'],
+        success: async (res) => {
+          if (res.tapIndex !== 0) {
+            return;
+          }
+          await this.onUnbindPair();
+        }
+      });
+      return;
+    }
+    wx.showActionSheet({
+      itemList: ['生成邀请码', '输入邀请码加入'],
+      success: async (res) => {
+        if (res.tapIndex === 0) {
+          await this.onCreateInvite();
+          return;
+        }
+        if (res.tapIndex === 1) {
+          this.setData({
+            acceptPanelVisible: true,
+            pendingInviteCode: ''
+          });
+        }
+      }
+    });
+  },
+
+  onPairCodeInput(e) {
+    const code = (e && e.detail && e.detail.value) || '';
+    this.setData({ pendingInviteCode: code.toUpperCase() });
+  },
+
+  onCancelAcceptInvite() {
+    this.setData({
+      acceptPanelVisible: false,
+      pendingInviteCode: ''
+    });
+  },
+
+  async onConfirmAcceptInvite() {
+    const code = String(this.data.pendingInviteCode || '').trim().toUpperCase();
+    if (!code) {
+      wx.showToast({ title: '请输入邀请码', icon: 'none' });
+      return;
+    }
+    try {
+      await acceptPairInvite(code);
+      this.setData({
+        acceptPanelVisible: false,
+        pendingInviteCode: ''
+      });
+      await this.refreshPairStatus();
+      wx.showToast({ title: '加入成功', icon: 'success' });
+    } catch (error) {
+      wx.showToast({ title: (error && error.message) || '加入失败', icon: 'none' });
+    }
+  },
+
+  async onCreateInvite() {
+    try {
+      const payload = await createPairInvite();
+      const code = payload && payload.code;
+      if (!code) {
+        wx.showToast({ title: '生成邀请码失败', icon: 'none' });
+        return;
+      }
+      wx.setClipboardData({
+        data: code,
+        success: () => {
+          wx.showModal({
+            title: '邀请码已生成',
+            content: `邀请码：${code}\n已复制到剪贴板，发给对方即可。`,
+            showCancel: false
+          });
+        }
+      });
+    } catch (error) {
+      wx.showToast({ title: (error && error.message) || '生成邀请码失败', icon: 'none' });
+    }
+  },
+
+  async onUnbindPair() {
+    try {
+      await unbindPair();
+      await this.refreshPairStatus();
+      await this.loadMarkers();
+      wx.showToast({ title: '已解除配对', icon: 'none' });
+    } catch (error) {
+      wx.showToast({ title: (error && error.message) || '解绑失败', icon: 'none' });
+    }
   },
 
   async requestLocationPermission() {

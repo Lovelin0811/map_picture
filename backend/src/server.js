@@ -12,6 +12,7 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const host = String(process.env.HOST || '0.0.0.0').trim() || '0.0.0.0';
 const sessionTtlMs = 7 * 24 * 60 * 60 * 1000;
+const inviteTtlMs = 7 * 24 * 60 * 60 * 1000;
 const defaultPageSize = Number(process.env.PHOTO_PAGE_SIZE || 30);
 const maxPageSize = Number(process.env.PHOTO_MAX_PAGE_SIZE || 80);
 const maxUploadMb = Number(process.env.MAX_UPLOAD_MB || 10);
@@ -98,6 +99,17 @@ function now() {
   return Date.now();
 }
 
+function normalizeAvatarUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return '';
+  }
+  return url.endsWith('/0') ? `${url.slice(0, -2)}/132` : url;
+}
+
+function createInviteCode() {
+  return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
+
 function parseOptionalFolderId(rawValue) {
   if (rawValue === null || rawValue === undefined || rawValue === '') {
     return null;
@@ -176,9 +188,11 @@ async function getSessionByToken(token) {
   const session = await get(
     `
     SELECT s.token, s.user_id as userId, s.expires_at as expiresAt,
-           u.nickname as nickname, u.avatar_url as avatarUrl, u.openid as openId
+           u.nickname as nickname, u.avatar_url as avatarUrl, u.openid as openId,
+           am.album_id as albumId, am.role as albumRole
     FROM sessions s
     JOIN users u ON u.id = s.user_id
+    LEFT JOIN album_members am ON am.user_id = s.user_id
     WHERE s.token = ?
   `,
     [token]
@@ -247,6 +261,53 @@ async function createSession(userId) {
   return { token, expiresAt };
 }
 
+async function ensureUserAlbumMembership(userId, nickname = '') {
+  const existed = await get(`SELECT album_id as albumId FROM album_members WHERE user_id = ?`, [userId]);
+  if (existed && existed.albumId) {
+    return Number(existed.albumId);
+  }
+  const ts = now();
+  const title = nickname ? `${nickname}的相册` : '共享相册';
+  const album = await run(`INSERT INTO albums(title, created_at, updated_at) VALUES (?, ?, ?)`, [title, ts, ts]);
+  const albumId = Number(album.lastID);
+  await run(`INSERT INTO album_members(album_id, user_id, role, created_at) VALUES (?, ?, ?, ?)`, [
+    albumId,
+    userId,
+    'owner',
+    ts
+  ]);
+  await run(`UPDATE photos SET album_id = ? WHERE user_id = ? AND (album_id IS NULL OR album_id = 0)`, [albumId, userId]);
+  await run(`UPDATE folders SET album_id = ? WHERE user_id = ? AND (album_id IS NULL OR album_id = 0)`, [albumId, userId]);
+  return albumId;
+}
+
+async function getPairStatusByAlbum(albumId, selfUserId) {
+  if (!albumId) {
+    return { paired: false, partner: null };
+  }
+  const members = await all(
+    `
+    SELECT u.id, u.nickname as nickName, u.avatar_url as avatarUrl
+    FROM album_members am
+    JOIN users u ON u.id = am.user_id
+    WHERE am.album_id = ?
+    ORDER BY am.created_at ASC
+  `,
+    [albumId]
+  );
+  const partner = members.find((item) => Number(item.id) !== Number(selfUserId)) || null;
+  return {
+    paired: !!partner,
+    partner: partner
+      ? {
+          userId: Number(partner.id),
+          nickName: partner.nickName || '',
+          avatarUrl: normalizeAvatarUrl(partner.avatarUrl || '')
+        }
+      : null
+  };
+}
+
 async function authMiddleware(req, res, next) {
   const token = getTokenFromRequest(req);
   if (!token) {
@@ -257,6 +318,9 @@ async function authMiddleware(req, res, next) {
   if (!session) {
     res.status(401).json({ message: '登录已过期，请重新登录' });
     return;
+  }
+  if (!session.albumId) {
+    session.albumId = await ensureUserAlbumMembership(session.userId, session.nickname || '');
   }
   req.auth = session;
   next();
@@ -280,6 +344,7 @@ app.post('/api/auth/wechat-login', async (req, res) => {
 
     const openId = await resolveOpenIdByCode(code);
     const user = await upsertUser(openId, nickName, avatarUrl);
+    const albumId = await ensureUserAlbumMembership(user.id, user.nickname || '');
     const session = await createSession(user.id);
     res.json({
       token: session.token,
@@ -287,8 +352,9 @@ app.post('/api/auth/wechat-login', async (req, res) => {
       user: {
         openId: user.openid,
         nickName: user.nickname,
-        avatarUrl: user.avatarUrl
-      }
+        avatarUrl: normalizeAvatarUrl(user.avatarUrl)
+      },
+      albumId
     });
   } catch (error) {
     logger.error('wechat-login failed', {
@@ -304,15 +370,155 @@ app.post('/api/auth/logout', authMiddleware, async (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/api/pair/status', authMiddleware, async (req, res) => {
+  const pairStatus = await getPairStatusByAlbum(req.auth.albumId, req.auth.userId);
+  const selfUser = await get(`SELECT nickname as nickName, avatar_url as avatarUrl FROM users WHERE id = ?`, [req.auth.userId]);
+  res.json({
+    albumId: req.auth.albumId,
+    paired: pairStatus.paired,
+    self: {
+      userId: req.auth.userId,
+      nickName: (selfUser && selfUser.nickName) || req.auth.nickname || '',
+      avatarUrl: normalizeAvatarUrl((selfUser && selfUser.avatarUrl) || req.auth.avatarUrl || '')
+    },
+    partner: pairStatus.partner
+  });
+});
+
+app.post('/api/pair/invite', authMiddleware, async (req, res) => {
+  const memberCountRow = await get(`SELECT COUNT(*) as total FROM album_members WHERE album_id = ?`, [req.auth.albumId]);
+  const memberCount = Number((memberCountRow && memberCountRow.total) || 0);
+  if (memberCount >= 2) {
+    res.status(409).json({ message: '当前相册已配对，无法再邀请' });
+    return;
+  }
+
+  await run(`UPDATE album_invites SET status = 'revoked' WHERE album_id = ? AND status = 'pending'`, [req.auth.albumId]);
+  const code = createInviteCode();
+  const ts = now();
+  const expiresAt = ts + inviteTtlMs;
+  await run(
+    `
+    INSERT INTO album_invites(token, album_id, inviter_user_id, status, expires_at, created_at)
+    VALUES(?, ?, ?, 'pending', ?, ?)
+  `,
+    [code, req.auth.albumId, req.auth.userId, expiresAt, ts]
+  );
+
+  res.json({
+    code,
+    expiresAt
+  });
+});
+
+app.post('/api/pair/accept', authMiddleware, async (req, res) => {
+  const code = String((req.body && req.body.code) || '')
+    .trim()
+    .toUpperCase();
+  if (!code) {
+    res.status(400).json({ message: '缺少邀请码' });
+    return;
+  }
+
+  const invite = await get(
+    `
+    SELECT id, token, album_id as albumId, inviter_user_id as inviterUserId, status, expires_at as expiresAt
+    FROM album_invites
+    WHERE token = ?
+  `,
+    [code]
+  );
+  if (!invite || invite.status !== 'pending') {
+    res.status(404).json({ message: '邀请码不存在或已失效' });
+    return;
+  }
+  if (invite.expiresAt <= now()) {
+    await run(`UPDATE album_invites SET status = 'expired' WHERE id = ?`, [invite.id]);
+    res.status(410).json({ message: '邀请码已过期' });
+    return;
+  }
+  if (Number(invite.inviterUserId) === Number(req.auth.userId)) {
+    res.status(400).json({ message: '不能接受自己发出的邀请' });
+    return;
+  }
+
+  const targetCountRow = await get(`SELECT COUNT(*) as total FROM album_members WHERE album_id = ?`, [invite.albumId]);
+  const targetCount = Number((targetCountRow && targetCountRow.total) || 0);
+  if (targetCount >= 2) {
+    res.status(409).json({ message: '该相册已配对完成' });
+    return;
+  }
+
+  const currentAlbumId = await ensureUserAlbumMembership(req.auth.userId, req.auth.nickname || '');
+  if (Number(currentAlbumId) !== Number(invite.albumId)) {
+    await run(`DELETE FROM album_members WHERE user_id = ?`, [req.auth.userId]);
+    await run(`INSERT INTO album_members(album_id, user_id, role, created_at) VALUES(?, ?, ?, ?)`, [
+      invite.albumId,
+      req.auth.userId,
+      'member',
+      now()
+    ]);
+    await run(`UPDATE photos SET album_id = ? WHERE user_id = ? AND album_id = ?`, [invite.albumId, req.auth.userId, currentAlbumId]);
+    await run(`UPDATE folders SET album_id = ? WHERE user_id = ? AND album_id = ?`, [invite.albumId, req.auth.userId, currentAlbumId]);
+  }
+
+  await run(
+    `UPDATE album_invites SET status = 'accepted', accepted_by_user_id = ?, accepted_at = ? WHERE id = ?`,
+    [req.auth.userId, now(), invite.id]
+  );
+
+  const pairStatus = await getPairStatusByAlbum(invite.albumId, req.auth.userId);
+  res.json({
+    ok: true,
+    albumId: invite.albumId,
+    paired: pairStatus.paired,
+    partner: pairStatus.partner
+  });
+});
+
+app.post('/api/pair/unbind', authMiddleware, async (req, res) => {
+  const currentAlbumId = await ensureUserAlbumMembership(req.auth.userId, req.auth.nickname || '');
+  const pairStatus = await getPairStatusByAlbum(currentAlbumId, req.auth.userId);
+  if (!pairStatus.paired) {
+    res.status(400).json({ message: '当前未配对，无需解绑' });
+    return;
+  }
+
+  const ts = now();
+  const newAlbum = await run(`INSERT INTO albums(title, created_at, updated_at) VALUES(?, ?, ?)`, [
+    '我的相册',
+    ts,
+    ts
+  ]);
+  const newAlbumId = Number(newAlbum.lastID);
+
+  await run(`DELETE FROM album_members WHERE user_id = ?`, [req.auth.userId]);
+  await run(`INSERT INTO album_members(album_id, user_id, role, created_at) VALUES(?, ?, ?, ?)`, [
+    newAlbumId,
+    req.auth.userId,
+    'owner',
+    ts
+  ]);
+
+  await run(`UPDATE photos SET album_id = ? WHERE user_id = ? AND album_id = ?`, [newAlbumId, req.auth.userId, currentAlbumId]);
+  await run(`UPDATE folders SET album_id = ? WHERE user_id = ? AND album_id = ?`, [newAlbumId, req.auth.userId, currentAlbumId]);
+  await run(`UPDATE album_invites SET status = 'revoked' WHERE album_id = ? AND status = 'pending'`, [currentAlbumId]);
+
+  res.json({
+    ok: true,
+    albumId: newAlbumId
+  });
+});
+
 app.get('/api/photos/stats', authMiddleware, async (req, res) => {
   const rows = await all(
     `
     SELECT province, COUNT(*) as count
     FROM photos
-    WHERE user_id = ?
+    WHERE album_id = ?
     GROUP BY province
   `,
-    [req.auth.userId]
+    [req.auth.albumId]
   );
   res.json(rows.map((row) => ({ province: row.province, count: Number(row.count) })));
 });
@@ -328,9 +534,9 @@ app.get('/api/photos', authMiddleware, async (req, res) => {
     `
     SELECT COUNT(*) as total
     FROM photos p
-    WHERE p.user_id = ? AND p.province = ?
+    WHERE p.album_id = ? AND p.province = ?
   `,
-    [req.auth.userId, province]
+    [req.auth.albumId, province]
   );
   const total = Number((totalRow && totalRow.total) || 0);
   const rows = await all(
@@ -338,12 +544,12 @@ app.get('/api/photos', authMiddleware, async (req, res) => {
     SELECT p.id, p.province, p.file_url as fileUrl, p.created_at as createdAt,
            p.folder_id as folderId, f.name as folderName
     FROM photos p
-    LEFT JOIN folders f ON f.id = p.folder_id AND f.user_id = p.user_id
-    WHERE p.user_id = ? AND p.province = ?
+    LEFT JOIN folders f ON f.id = p.folder_id AND f.album_id = p.album_id
+    WHERE p.album_id = ? AND p.province = ?
     ORDER BY p.created_at DESC
     LIMIT ? OFFSET ?
   `,
-    [req.auth.userId, province, pageSize, offset]
+    [req.auth.albumId, province, pageSize, offset]
   );
   res.json({
     items: rows,
@@ -365,11 +571,11 @@ app.get('/api/folders', authMiddleware, async (req, res) => {
     SELECT f.id, f.name, f.province, f.created_at as createdAt, COUNT(p.id) as count
     FROM folders f
     LEFT JOIN photos p ON p.folder_id = f.id
-    WHERE f.user_id = ? AND f.province = ?
+    WHERE f.album_id = ? AND f.province = ?
     GROUP BY f.id
     ORDER BY f.created_at ASC
   `,
-    [req.auth.userId, province]
+    [req.auth.albumId, province]
   );
   res.json(rows.map((row) => ({ ...row, count: Number(row.count || 0) })));
 });
@@ -391,8 +597,8 @@ app.post('/api/folders', authMiddleware, async (req, res) => {
   }
 
   const existed = await get(
-    `SELECT id FROM folders WHERE user_id = ? AND province = ? AND name = ?`,
-    [req.auth.userId, province, name]
+    `SELECT id FROM folders WHERE album_id = ? AND province = ? AND name = ?`,
+    [req.auth.albumId, province, name]
   );
   if (existed) {
     res.status(409).json({ message: '文件夹已存在' });
@@ -402,10 +608,10 @@ app.post('/api/folders', authMiddleware, async (req, res) => {
   const createdAt = now();
   const result = await run(
     `
-    INSERT INTO folders(user_id, province, name, created_at)
-    VALUES(?, ?, ?, ?)
+    INSERT INTO folders(user_id, album_id, province, name, created_at)
+    VALUES(?, ?, ?, ?, ?)
   `,
-    [req.auth.userId, province, name, createdAt]
+    [req.auth.userId, req.auth.albumId, province, name, createdAt]
   );
   res.json({
     id: result.lastID,
@@ -425,8 +631,8 @@ app.delete('/api/folders/:id', authMiddleware, async (req, res) => {
     }
 
     const target = await get(
-      `SELECT id, province, name FROM folders WHERE id = ? AND user_id = ?`,
-      [folderId, req.auth.userId]
+      `SELECT id, province, name FROM folders WHERE id = ? AND album_id = ?`,
+      [folderId, req.auth.albumId]
     );
     if (!target) {
       res.status(404).json({ message: '文件夹不存在' });
@@ -435,16 +641,16 @@ app.delete('/api/folders/:id', authMiddleware, async (req, res) => {
 
     const keepPhotos = !(req.body && req.body.keepPhotos === false);
     if (keepPhotos) {
-      await run(`UPDATE photos SET folder_id = NULL WHERE user_id = ? AND folder_id = ?`, [req.auth.userId, folderId]);
+      await run(`UPDATE photos SET folder_id = NULL WHERE album_id = ? AND folder_id = ?`, [req.auth.albumId, folderId]);
     } else {
-      const photos = await all(`SELECT id, file_path as filePath FROM photos WHERE user_id = ? AND folder_id = ?`, [
-        req.auth.userId,
+      const photos = await all(`SELECT id, file_path as filePath FROM photos WHERE album_id = ? AND folder_id = ?`, [
+        req.auth.albumId,
         folderId
       ]);
-      await run(`DELETE FROM photos WHERE user_id = ? AND folder_id = ?`, [req.auth.userId, folderId]);
+      await run(`DELETE FROM photos WHERE album_id = ? AND folder_id = ?`, [req.auth.albumId, folderId]);
       await Promise.allSettled(photos.map((item) => unlinkUploadFileSafe(item.filePath)));
     }
-    await run(`DELETE FROM folders WHERE id = ? AND user_id = ?`, [folderId, req.auth.userId]);
+    await run(`DELETE FROM folders WHERE id = ? AND album_id = ?`, [folderId, req.auth.albumId]);
 
     res.json({
       ok: true,
@@ -480,8 +686,8 @@ app.get('/api/photos/file/:id', authMiddleware, async (req, res) => {
   }
 
   const target = await get(
-    `SELECT file_path as filePath FROM photos WHERE id = ? AND user_id = ?`,
-    [photoId, req.auth.userId]
+    `SELECT file_path as filePath FROM photos WHERE id = ? AND album_id = ?`,
+    [photoId, req.auth.albumId]
   );
   if (!target || !target.filePath) {
     res.status(404).json({ message: '照片不存在' });
@@ -541,8 +747,8 @@ app.post('/api/photos/upload', authMiddleware, uploadPhotoMiddleware, async (req
     }
     if (folderId) {
       const folder = await get(
-        `SELECT id FROM folders WHERE id = ? AND user_id = ? AND province = ?`,
-        [folderId, req.auth.userId, province]
+        `SELECT id FROM folders WHERE id = ? AND album_id = ? AND province = ?`,
+        [folderId, req.auth.albumId, province]
       );
       if (!folder) {
         res.status(400).json({ message: '文件夹不存在' });
@@ -553,10 +759,10 @@ app.post('/api/photos/upload', authMiddleware, uploadPhotoMiddleware, async (req
     const createdAt = now();
     const result = await run(
       `
-      INSERT INTO photos(user_id, province, file_url, file_path, created_at, folder_id)
-      VALUES(?, ?, ?, ?, ?, ?)
+      INSERT INTO photos(user_id, province, file_url, file_path, created_at, folder_id, album_id)
+      VALUES(?, ?, ?, ?, ?, ?, ?)
     `,
-      [req.auth.userId, province, fileUrl, filePath, createdAt, folderId]
+      [req.auth.userId, province, fileUrl, filePath, createdAt, folderId, req.auth.albumId]
     );
     res.json({
       id: result.lastID,
@@ -583,8 +789,8 @@ app.patch('/api/photos/:id/folder', authMiddleware, async (req, res) => {
   }
 
   const photo = await get(
-    `SELECT id, province FROM photos WHERE id = ? AND user_id = ?`,
-    [photoId, req.auth.userId]
+    `SELECT id, province FROM photos WHERE id = ? AND album_id = ?`,
+    [photoId, req.auth.albumId]
   );
   if (!photo) {
     res.status(404).json({ message: '照片不存在' });
@@ -593,8 +799,8 @@ app.patch('/api/photos/:id/folder', authMiddleware, async (req, res) => {
 
   if (folderId) {
     const folder = await get(
-      `SELECT id FROM folders WHERE id = ? AND user_id = ? AND province = ?`,
-      [folderId, req.auth.userId, photo.province]
+      `SELECT id FROM folders WHERE id = ? AND album_id = ? AND province = ?`,
+      [folderId, req.auth.albumId, photo.province]
     );
     if (!folder) {
       res.status(400).json({ message: '文件夹不存在或不属于当前省份' });
@@ -615,15 +821,15 @@ app.delete('/api/photos/:id', authMiddleware, async (req, res) => {
     }
 
     const target = await get(
-      `SELECT id, file_path as filePath FROM photos WHERE id = ? AND user_id = ?`,
-      [photoId, req.auth.userId]
+      `SELECT id, file_path as filePath FROM photos WHERE id = ? AND album_id = ?`,
+      [photoId, req.auth.albumId]
     );
     if (!target) {
       res.status(404).json({ message: '照片不存在' });
       return;
     }
 
-    await run(`DELETE FROM photos WHERE id = ?`, [photoId]);
+    await run(`DELETE FROM photos WHERE id = ? AND album_id = ?`, [photoId, req.auth.albumId]);
     await unlinkUploadFileSafe(target.filePath);
 
     res.json({ ok: true });
