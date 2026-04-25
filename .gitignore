@@ -4,5 +4,6 @@ backend/.idea/
 backend/target/
 logs/
 uploads/
+backend/local.properties
 backend/logs/
 backend/uploads/
