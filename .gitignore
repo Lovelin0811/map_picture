@@ -3,5 +3,6 @@
 backend/.idea/
 backend/target/
 logs/
+uploads/
 backend/logs/
 backend/uploads/
