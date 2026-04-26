@@ -50,11 +50,15 @@ mvn spring-boot:run
 ## 小程序启动
 
 1. 微信开发者工具导入 `miniprogram` 目录。
-2. 根据运行环境修改 `miniprogram/config.js`：
-- `dev`：开发者工具本机调试
-- `device`：真机调试（改成电脑局域网 IP）
-- `prod`：线上域名
-3. 本地联调时，开发者工具可勾选“不校验合法域名”。
+2. 创建 `miniprogram/config.local.js`，配置后端服务器地址：
+```js
+module.exports = {
+  API_BASE: 'http://后端服务器公网IP:3000'
+};
+```
+3. 不创建 `config.local.js` 时默认连接 `http://127.0.0.1:3000`。
+4. 本地联调时，开发者工具可勾选"不校验合法域名"。
+5. `config.local.js` 已在 `.gitignore` 中，不会提交到远程仓库。
 
 ## 关键配置
 
@@ -65,4 +69,4 @@ mvn spring-boot:run
 
 ## 备注
 
-- 代码仓库忽略了 IDE 与运行产物目录：`.idea/`、`backend/.idea/`、`backend/target/`、`logs/`。
+- 代码仓库忽略了 IDE 与运行产物目录：`.idea/`、`backend/.idea/`、`backend/target/`、`logs/`、`deploy.sh`、`config.local.js`、`.workbuddy/`。
