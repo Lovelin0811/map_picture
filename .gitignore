@@ -7,3 +7,4 @@ uploads/
 backend/local.properties
 backend/logs/
 backend/uploads/
+miniprogram/config.local.js
