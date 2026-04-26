@@ -9,3 +9,4 @@ backend/logs/
 backend/uploads/
 miniprogram/config.local.js
 deploy.sh
+.workbuddy/
