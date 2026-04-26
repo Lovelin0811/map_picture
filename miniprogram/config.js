@@ -3,12 +3,12 @@ const API_BASE_BY_ENV = {
   dev: 'http://127.0.0.1:3000',
   // 真机调试（请改成当前电脑局域网 IP）
   device: 'http://192.168.10.4:3000',
-  // 正式环境（替换为你的正式域名）
-  prod: 'https://example.com'
+  // 阿里云 ECS（后续配了 HTTPS 域名再改为 https://）
+  prod: 'http://47.116.214.42:3000'
 };
 
 // 只改这一行就能切环境：dev | device | prod
-const API_ENV = 'device';
+const API_ENV = 'prod';
 
 module.exports = {
   API_ENV,

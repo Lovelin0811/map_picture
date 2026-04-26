@@ -14,9 +14,9 @@
 - 上传支持 multipart 和 base64 两种模式
 
 ## 已知问题（待修复）
-1. `deleteFolder()` - 事务内删磁盘文件，原子性风险（高优先级）
-2. `restoreSession()` - 不检查 token `expiresAt`，冷启动首请求可能 401（高优先级）
-3. 缩略图下载失败时 `displayPath=''`，图片空白且点击无效（中优先级）
+1. ~~`deleteFolder()` - 事务内删磁盘文件，原子性风险~~ ✅ 已修复（拆分事务与文件删除）
+2. ~~`restoreSession()` - 不检查 token `expiresAt`，冷启动首请求可能 401~~ ✅ 已修复
+3. ~~缩略图下载失败时 `displayPath=''`，图片空白且点击无效~~ ✅ 已修复（占位UI+点击重试）
 4. CORS 配置：`corsOrigin` 为空时允许所有来源（中优先级）
 5. `config.js` prod URL 仍为占位符 `https://example.com`（部署前必改）
 6. `savePhoto()` - INSERT 空 `file_url` 再 UPDATE，可简化或删掉该字段
