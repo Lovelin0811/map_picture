@@ -396,8 +396,21 @@ public class AlbumService {
         return Map.of("id", id, "province", province, "name", name, "createdAt", createdAt, "count", 0);
     }
 
-    @Transactional
     public Map<String, Object> deleteFolder(long albumId, long folderId, boolean keepPhotos) {
+        List<String> orphanedPaths = deleteFolderInDb(albumId, folderId, keepPhotos);
+        // 事务提交成功后，再清理磁盘文件
+        for (String filePath : orphanedPaths) {
+            deleteUploadFileSafe(filePath);
+        }
+        return Map.of(
+                "ok", true,
+                "id", folderId,
+                "keepPhotos", keepPhotos
+        );
+    }
+
+    @Transactional
+    protected List<String> deleteFolderInDb(long albumId, long folderId, boolean keepPhotos) {
         Map<String, Object> target = jdbcTemplate.query("""
                         SELECT id, province, name FROM folders WHERE id = ? AND album_id = ?
                         """,
@@ -415,24 +428,16 @@ public class AlbumService {
         if (target == null) {
             throw new ApiException(404, "文件夹不存在");
         }
+        List<String> paths = List.of();
         if (keepPhotos) {
             jdbcTemplate.update("UPDATE photos SET folder_id = NULL WHERE album_id = ? AND folder_id = ?", albumId, folderId);
         } else {
-            List<String> paths = jdbcTemplate.query("SELECT file_path FROM photos WHERE album_id = ? AND folder_id = ?",
+            paths = jdbcTemplate.query("SELECT file_path FROM photos WHERE album_id = ? AND folder_id = ?",
                     (rs, rowNum) -> rs.getString("file_path"), albumId, folderId);
             jdbcTemplate.update("DELETE FROM photos WHERE album_id = ? AND folder_id = ?", albumId, folderId);
-            for (String filePath : paths) {
-                deleteUploadFileSafe(filePath);
-            }
         }
         jdbcTemplate.update("DELETE FROM folders WHERE id = ? AND album_id = ?", folderId, albumId);
-        return Map.of(
-                "ok", true,
-                "id", folderId,
-                "province", target.get("province"),
-                "name", target.get("name"),
-                "keepPhotos", keepPhotos
-        );
+        return paths;
     }
 
     public Path resolvePhotoFilePath(long photoId, long albumId) {
