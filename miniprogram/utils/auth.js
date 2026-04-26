@@ -47,11 +47,15 @@ async function manualLogin(profile = {}) {
 
 function restoreSession() {
   const cached = wx.getStorageSync(AUTH_STORAGE_KEY);
-  if (cached && cached.token) {
+  if (cached && cached.token && cached.expiresAt && cached.expiresAt > Date.now()) {
     setAuthToken(cached.token);
     return cached;
   }
+  // token 不存在或已过期，清除缓存
   setAuthToken('');
+  if (cached) {
+    wx.removeStorageSync(AUTH_STORAGE_KEY);
+  }
   return null;
 }
 

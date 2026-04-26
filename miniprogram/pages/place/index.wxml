@@ -65,6 +65,7 @@
   <view wx:if="{{photos.length > 0}}" class="grid">
     <view wx:for="{{photos}}" wx:key="id" class="photo-wrap {{item.checked ? 'is-selected' : ''}}">
       <image
+        wx:if="{{!item.loadFailed}}"
         class="photo"
         src="{{item.displayPath}}"
         mode="aspectFill"
@@ -73,6 +74,16 @@
         bindtap="onPhotoTap"
         bindlongpress="onPhotoLongPress"
       />
+      <view
+        wx:if="{{item.loadFailed}}"
+        class="photo-failed"
+        data-id="{{item.id}}"
+        bindtap="onPhotoTap"
+        bindlongpress="onPhotoLongPress"
+      >
+        <text class="photo-failed-icon">⚠</text>
+        <text class="photo-failed-text">点击重试</text>
+      </view>
       <view wx:if="{{selectionMode}}" class="check-dot {{item.checked ? 'checked' : ''}}"></view>
       <view class="photo-meta">
         <text wx:if="{{item.folderName}}" class="folder-tag">{{item.folderName}}</text>

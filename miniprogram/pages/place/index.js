@@ -40,6 +40,7 @@ Page({
       province
     });
     this.thumbnailCache = {};
+    this.thumbnailFailed = {};
   },
 
   async onShow() {
@@ -143,6 +144,17 @@ Page({
         const localPath = await this.downloadToTempPath(photoId);
         if (localPath) {
           this.thumbnailCache[photoId] = localPath;
+          // 下载成功，清除失败标记
+          if (this.thumbnailFailed && this.thumbnailFailed[photoId]) {
+            delete this.thumbnailFailed[photoId];
+          }
+          changed = true;
+        } else {
+          // 记录下载失败
+          if (!this.thumbnailFailed) {
+            this.thumbnailFailed = {};
+          }
+          this.thumbnailFailed[photoId] = true;
           changed = true;
         }
       })
@@ -217,7 +229,28 @@ Page({
       this.togglePhotoSelection(id);
       return;
     }
+    // 缩略图加载失败时，点击重试下载
+    const photoId = Number(id);
+    if (this.thumbnailFailed && this.thumbnailFailed[photoId]) {
+      this.retryThumbnail(photoId);
+      return;
+    }
     this.onPreview(path);
+  },
+
+  async retryThumbnail(photoId) {
+    wx.showLoading({ title: '加载中', mask: true });
+    const localPath = await this.downloadToTempPath(photoId);
+    wx.hideLoading();
+    if (localPath) {
+      this.thumbnailCache[photoId] = localPath;
+      delete this.thumbnailFailed[photoId];
+      this.applyPhotoFilter();
+      // 加载成功后直接预览
+      this.onPreview(localPath);
+    } else {
+      wx.showToast({ title: '加载失败，请稍后重试', icon: 'none' });
+    }
   },
 
   onPreview(path) {
@@ -392,9 +425,12 @@ Page({
     const withUi = (items) =>
       items.map((item) => {
         const photoId = Number(item.id);
+        const cached = this.thumbnailCache[photoId];
+        const loadFailed = this.thumbnailFailed && this.thumbnailFailed[photoId];
         return {
           ...item,
-          displayPath: this.thumbnailCache[photoId] || '',
+          displayPath: cached || '',
+          loadFailed: !!loadFailed,
           checked: selectedSet.has(photoId)
         };
       });
