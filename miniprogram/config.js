@@ -4,7 +4,7 @@ const API_BASE_BY_ENV = {
   // 真机调试（请改成当前电脑局域网 IP）
   device: 'http://192.168.10.4:3000',
   // 阿里云 ECS（备案后改为 https://lovelin.com.cn）
-  prod: 'http://lovelin.com.cn'
+  prod: 'http://47.116.214.42:3000'
 };
 
 // 只改这一行就能切环境：dev | device | prod
