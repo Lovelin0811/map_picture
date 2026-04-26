@@ -2,7 +2,7 @@
 // 没有 config.local.js 时默认 http://127.0.0.1:3000
 // config.local.js 示例：
 //   module.exports = {
-//     API_BASE: 'http://47.116.214.42:3000'
+//     API_BASE: 'http://你的服务器地址:3000'
 //   };
 
 let local = {};
